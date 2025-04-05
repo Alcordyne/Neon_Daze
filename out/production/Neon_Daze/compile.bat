@@ -1,1 +1,0 @@
-javac -Xlint:unchecked ND/*.java
