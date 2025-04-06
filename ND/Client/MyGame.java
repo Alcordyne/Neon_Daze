@@ -1,13 +1,25 @@
-package ND;
+package ND.Client;
 
 import tage.*;
+import tage.input.action.AbstractInputAction;
 import tage.input.action.BckAction;
 import tage.input.action.FwdAction;
+import tage.input.action.TurnAction;
 import tage.shapes.*;
 import tage.input.*;
 
 import java.awt.event.*;
 import java.lang.Math;
+
+import java.io.*;
+import java.util.*;
+import java.util.UUID;
+import java.net.InetAddress;
+
+import java.net.UnknownHostException;
+import net.java.games.input.*;
+import net.java.games.input.Component.Identifier.*;
+import tage.networking.IGameConnection.ProtocolType;
 
 import org.joml.*;
 import tage.nodeControllers.*;
@@ -20,33 +32,40 @@ hazard controller, character moves, custom models
 public class MyGame extends VariableFrameRateGame
 {
 	private static Engine engine;
-
-	private int horizons;
-
+	private InputManager im;
 	private NodeController rc,ocs;
+	private Light glight;
+
+	private GhostManager gm;
+	private String serverAddress;
+	private int serverPort;
+	private ProtocolType serverProtocol;
+	private ProtocolClient protClient;
+	private boolean isClientConnected = false;
 
 	public boolean axis = true;
 	private boolean gameOver = false;
 	private double lastFrameTime, currFrameTime, elapsTime;
 
+	private int horizons;
 	private float panX, panY = 0.0f;
 	private float zoom = 1.0f;
-
 	private String counterStr = "";
 
-	private InputManager im;
 	private GameObject avatar,terr,x,y,z;
-	private ObjShape avatarS,terrS,linxS,linyS,linzS;
-	private TextureImage avatartx, hmap,ground;
+	private ObjShape avatarS, ghostS, terrS,linxS,linyS,linzS;
+	private TextureImage avatartx, ghostT, hmap, ground;
 
-	private Light glight;
-
-	public MyGame() { super(); }
-
+	public MyGame(String serverAddress, int serverPort, String protocol)
+	{	super();
+		gm = new GhostManager(this);
+		this.serverAddress = serverAddress;
+		this.serverPort = serverPort;
+		if (protocol.toUpperCase().compareTo("UDP") == 0)
+			this.serverProtocol = ProtocolType.UDP;
+	}
 	public static void main(String[] args)
-	{
-
-		MyGame game = new MyGame();
+	{	MyGame game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
 		engine = new Engine(game);
 		game.initializeSystem();
 		game.game_loop();
@@ -76,6 +95,7 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void loadShapes()
 	{	avatarS = new ImportedModel("dolphinHighPoly.obj");
+		ghostS = new ImportedModel("dolphinHighPoly.obj");
 		terrS = new TerrainPlane(400);
 		linxS = new Line(new Vector3f(0f,0f,0f), new Vector3f(3f,0f,0f));
 		linyS = new Line(new Vector3f(0f,0f,0f), new Vector3f(0f,3f,0f));
@@ -86,9 +106,9 @@ public class MyGame extends VariableFrameRateGame
 	public void loadTextures()
 	{
 		avatartx = new TextureImage("Dolphin_HighPolyUV.png");
+		ghostT = new TextureImage("redDolphin.jpg");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
-
 	}
 
 	@Override
@@ -111,8 +131,7 @@ public class MyGame extends VariableFrameRateGame
 		avatar = new GameObject(GameObject.root(), avatarS, avatartx);
 		initialTranslation = (new Matrix4f()).translation(0f,0f,0f);
 		avatar.setLocalTranslation(initialTranslation);
-		Matrix4f initialRotation = (new Matrix4f()).rotationY(
-				(float) Math.toRadians(135.0f));
+		Matrix4f initialRotation = (new Matrix4f()).rotationY((float) Math.toRadians(0.0f));
 		avatar.setLocalRotation(initialRotation);
 
 		// build terrain object
@@ -151,6 +170,7 @@ public class MyGame extends VariableFrameRateGame
 		elapsTime = 0.0;
 		(engine.getRenderSystem()).setWindowDimensions(1900,1000);
 
+		setupNetworking();
 
 		// ------------ set up node controller --------------
 		rc = new RotationController(engine, new Vector3f(0,1,0), 0.01f);
@@ -170,27 +190,24 @@ public class MyGame extends VariableFrameRateGame
 
 
         // ----------------- OTHER INPUTS SECTION -----------------------------
-		FwdAction fwdAction = new FwdAction(this);
-		BckAction bckAction = new BckAction(this);
+		FwdAction fwdAction = new FwdAction(this, protClient);
+		BckAction bckAction = new BckAction(this, protClient);
+		TurnAction turnAction = new TurnAction(this, protClient);
 
 			im.associateActionWithAllKeyboards(
 					net.java.games.input.Component.Identifier.Key.W, fwdAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+					protClient.sendMoveMessage(avatar.getWorldLocation());
 			im.associateActionWithAllKeyboards(
 					net.java.games.input.Component.Identifier.Key.S, bckAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.A, (time, e) -> {
-
-						avatar.globalYaw(.02f); // Rotate dolphin left
-
-				}, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.D, (time, e) -> {
-
-						avatar.globalYaw(-0.02f); // Rotate dolphin right
-
-				}, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+					protClient.sendMoveMessage(avatar.getWorldLocation());
+			im.associateActionWithAllKeyboards(
+					net.java.games.input.Component.Identifier.Key.A, turnAction,
+					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+			im.associateActionWithAllKeyboards(
+					net.java.games.input.Component.Identifier.Key.D, turnAction,
+					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 
 		// Zooming in and out HUD 2
 		im.associateActionWithAllKeyboards(
@@ -267,16 +284,14 @@ public class MyGame extends VariableFrameRateGame
 
 
 		if (!gameOver) {
-			elapsTime += (currFrameTime - lastFrameTime) / 1000.0;
-
-			im.update((float)elapsTime);
+			long currentTime = System.currentTimeMillis();
+			double deltaTime = (currentTime - lastFrameTime) / 1000.0; // seconds
+			lastFrameTime = currentTime;
+			
+			im.update((float)deltaTime);
 			avatarMove();
 			CameraOverhead();
-
-
-
-
-
+			processNetworking((float)deltaTime);
 		}
 	}
 
@@ -366,6 +381,49 @@ public class MyGame extends VariableFrameRateGame
 		super.keyPressed(e);
 	}
 
+	// ---------- NETWORKING SECTION ----------------
 
+	public ObjShape getGhostShape() { return ghostS; }
+	public TextureImage getGhostTexture() { return ghostT; }
+	public GhostManager getGhostManager() { return gm; }
+	public static Engine getEngine() { return engine; }
+	
+	private void setupNetworking()
+	{	isClientConnected = false;	
+		try 
+		{	protClient = new ProtocolClient(InetAddress.getByName(serverAddress), serverPort, serverProtocol, this);
+		} 	catch (UnknownHostException e) 
+		{	e.printStackTrace();
+		}	catch (IOException e) 
+		{	e.printStackTrace();
+		}
+		if (protClient == null)
+		{	System.out.println("missing protocol host");
+		}
+		else
+		{	// Send the initial join message with a unique identifier for this client
+			System.out.println("sending join message to protocol host");
+			protClient.sendJoinMessage();
+		}
+	}
+	
+	protected void processNetworking(float elapsTime)
+	{	// Process packets received by the client from the server
+		if (protClient != null)
+			protClient.processPackets();
+	}
+
+	public Vector3f getPlayerPosition() { return avatar.getWorldLocation(); }
+
+	public void setIsConnected(boolean value) { this.isClientConnected = value; }
+	
+	private class SendCloseConnectionPacketAction extends AbstractInputAction
+	{	@Override
+		public void performAction(float time, net.java.games.input.Event evt) 
+		{	if(protClient != null && isClientConnected == true)
+			{	protClient.sendByeMessage();
+			}
+		}
+	}
 }
 

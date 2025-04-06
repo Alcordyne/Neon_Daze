@@ -187,7 +187,12 @@ public class RenderSystem extends JFrame implements GLEventListener
 		gl.glClear(GL_COLOR_BUFFER_BIT);
 		gl.glClear(GL_DEPTH_BUFFER_BIT);
 
-		(engine.getGame()).update();
+		try {
+			(engine.getGame()).update();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
 		(engine.getSceneGraph()).applyNodeControllers();
 
 		LightManager lm = engine.getLightManager();
