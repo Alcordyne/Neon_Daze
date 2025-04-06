@@ -1,46 +1,35 @@
 package tage.input.action;
 
-import ND.MyGame;
+import tage.GameObject;
 import net.java.games.input.Event;
-import org.joml.Vector3f;
-import tage.Camera;
-import tage.VariableFrameRateGame;
+import org.joml.*;
+
+import ND.Client.MyGame;
+import ND.Client.ProtocolClient;
 
 public class TurnAction extends AbstractInputAction {
     private MyGame game;
-    private Camera camera;
-    private Vector3f rightVector, upVector, fwdVector;
+    private ProtocolClient protClient;
+    private float turnAmount = 4.0f;
 
-    public TurnAction(MyGame g) {
-        game = g;
+    public TurnAction(MyGame game, ProtocolClient protClient) {
+        this.game = game;
+        this.protClient = protClient;
     }
 
     @Override
-    public void performAction(float time, Event e) {
-        float keyValue = e.getValue();
+    public void performAction(float time, Event evt) {
+        // Determine the direction based on the key pressed
+        String key = evt.getComponent().getName();
 
-        // Deadzone check
-        if (keyValue > -0.2 && keyValue < 0.2) return;
-
-        // Get the camera from the viewport
-        camera = VariableFrameRateGame.getEngine().getRenderSystem().getViewport("MAIN").getCamera();
-
-        // Get camera direction vectors
-        rightVector = new Vector3f(camera.getU());
-        upVector = new Vector3f(camera.getV());
-        fwdVector = new Vector3f(camera.getN());
-
-        // Determine rotation direction based on the key press (left or right)
-        float rotationAngle = 0.01f; // The rotation speed (can be adjusted)
-        if (keyValue < 0) { // Left turn (A key)
-            rotationAngle = -rotationAngle;
+        if (key.equals("A")) {
+            // Turn left
+            game.getAvatar().globalYaw(turnAmount*time);
+            protClient.sendTurnMessage(turnAmount*time);
+        } else if (key.equals("D")) {
+            // Turn right
+            game.getAvatar().globalYaw(-turnAmount*time);
+            protClient.sendTurnMessage(-turnAmount*time);
         }
-
-        rightVector.rotateAxis(rotationAngle, upVector.x(), upVector.y(), upVector.z());
-        fwdVector.rotateAxis(rotationAngle, upVector.x(), upVector.y(), upVector.z());
-
-        camera.setU(rightVector);
-        camera.setN(fwdVector);
     }
 }
-
