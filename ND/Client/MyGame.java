@@ -95,7 +95,7 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void loadShapes()
 	{	avatarS = new ImportedModel("panda.obj");
-		ghostS = new ImportedModel("dolphinHighPoly.obj");
+		ghostS = new ImportedModel("panda.obj");
 		terrS = new TerrainPlane(400);
 		linxS = new Line(new Vector3f(0f,0f,0f), new Vector3f(3f,0f,0f));
 		linyS = new Line(new Vector3f(0f,0f,0f), new Vector3f(0f,3f,0f));
@@ -106,7 +106,7 @@ public class MyGame extends VariableFrameRateGame
 	public void loadTextures()
 	{
 		avatartx = new TextureImage("pandatx.jpg");
-		ghostT = new TextureImage("redDolphin.jpg");
+		ghostT = new TextureImage("redPandaTx.png");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
 	}
