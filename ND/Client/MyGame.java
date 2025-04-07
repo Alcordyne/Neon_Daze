@@ -94,7 +94,7 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void loadShapes()
-	{	avatarS = new ImportedModel("dolphinHighPoly.obj");
+	{	avatarS = new ImportedModel("panda.obj");
 		ghostS = new ImportedModel("dolphinHighPoly.obj");
 		terrS = new TerrainPlane(400);
 		linxS = new Line(new Vector3f(0f,0f,0f), new Vector3f(3f,0f,0f));
@@ -105,7 +105,7 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void loadTextures()
 	{
-		avatartx = new TextureImage("Dolphin_HighPolyUV.png");
+		avatartx = new TextureImage("pandatx.jpg");
 		ghostT = new TextureImage("redDolphin.jpg");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
@@ -130,6 +130,8 @@ public class MyGame extends VariableFrameRateGame
 		// build avatar in the center of the window
 		avatar = new GameObject(GameObject.root(), avatarS, avatartx);
 		initialTranslation = (new Matrix4f()).translation(0f,0f,0f);
+		initialScale = (new Matrix4f()).scaling(.6f, .6f, .6f);
+		avatar.setLocalScale(initialScale);
 		avatar.setLocalTranslation(initialTranslation);
 		Matrix4f initialRotation = (new Matrix4f()).rotationY((float) Math.toRadians(0.0f));
 		avatar.setLocalRotation(initialRotation);
