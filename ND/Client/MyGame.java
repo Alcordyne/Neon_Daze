@@ -52,9 +52,9 @@ public class MyGame extends VariableFrameRateGame
 	private float zoom = 1.0f;
 	private String counterStr = "";
 
-	private GameObject avatar,terr,x,y,z;
-	private ObjShape avatarS, ghostS, terrS,linxS,linyS,linzS;
-	private TextureImage avatartx, ghostT, hmap, ground;
+	private GameObject avatar,terr, bat, x,y,z;
+	private ObjShape avatarS, ghostS, terrS,linxS,linyS,linzS, batS;
+	private TextureImage avatartx, ghostT, hmap, ground, wood;
 
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
@@ -96,6 +96,7 @@ public class MyGame extends VariableFrameRateGame
 	public void loadShapes()
 	{	avatarS = new ImportedModel("panda.obj");
 		ghostS = new ImportedModel("panda.obj");
+		batS = new ImportedModel("bat.obj");
 		terrS = new TerrainPlane(400);
 		linxS = new Line(new Vector3f(0f,0f,0f), new Vector3f(3f,0f,0f));
 		linyS = new Line(new Vector3f(0f,0f,0f), new Vector3f(0f,3f,0f));
@@ -109,6 +110,7 @@ public class MyGame extends VariableFrameRateGame
 		ghostT = new TextureImage("redPandaTx.png");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
+		wood = new TextureImage("wood.jpg");
 	}
 
 	@Override
@@ -146,6 +148,15 @@ public class MyGame extends VariableFrameRateGame
         // set tiling for terrain texture
 		terr.getRenderStates().setTiling(1);
 		terr.getRenderStates().setTileFactor(1);
+
+		//build bat
+		bat = new GameObject(avatar, batS, wood);
+		initialTranslation = (new Matrix4f()).translation(-.25f,0.32f,.2f);
+		bat.setLocalTranslation(initialTranslation);
+		initialScale = (new Matrix4f()).scaling(.05f, .05f, .05f);
+		bat.setLocalScale(initialScale);
+		initialRotation = (new Matrix4f()).rotationY((float) Math.toRadians(-90.0f));
+		bat.setLocalRotation(initialRotation);
 
 	}
 
@@ -322,6 +333,14 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f cameraOffset = new Vector3f(fwd).mul(-2.5f).add(up.mul(1.3f));
 		Vector3f cameraPosition = new Vector3f(loc).add(cameraOffset);
 		cam.setLocation(cameraPosition);
+
+		// Update the bat's position and orientation relative to the avatar
+		Matrix4f handOffset = new Matrix4f().translation(-0.25f, 0.32f, .2f);  // Adjust to avatar's hand position
+		Matrix4f relativeRotation = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));  // Initial bat orientation
+
+		// Combine the transformations: avatar rotation -> hand offset -> bat rotation
+		Matrix4f finalTransform = new Matrix4f().mul(avatar.getLocalRotation()).mul(handOffset).mul(relativeRotation);
+		bat.setLocalTranslation(finalTransform);
 	}
 	// overhead camera for viewport 2
 	public void CameraOverhead(){
