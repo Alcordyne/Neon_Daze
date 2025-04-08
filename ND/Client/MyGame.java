@@ -52,9 +52,9 @@ public class MyGame extends VariableFrameRateGame
 	private float zoom = 1.0f;
 	private String counterStr = "";
 
-	private GameObject avatar,terr, bat, x,y,z;
-	private ObjShape avatarS, ghostS, terrS,linxS,linyS,linzS, batS;
-	private TextureImage avatartx, ghostT, hmap, ground, wood;
+	private GameObject avatar,terr, bat,hammer, x,y,z;
+	private ObjShape avatarS, ghostS, terrS,linxS,linyS,linzS, batS,hammerS;
+	private TextureImage avatartx, ghostT, hmap, ground, wood,hammerTx;
 
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
@@ -97,6 +97,7 @@ public class MyGame extends VariableFrameRateGame
 	{	avatarS = new ImportedModel("panda.obj");
 		ghostS = new ImportedModel("panda.obj");
 		batS = new ImportedModel("bat.obj");
+		hammerS = new ImportedModel("hammer.obj");
 		terrS = new TerrainPlane(400);
 		linxS = new Line(new Vector3f(0f,0f,0f), new Vector3f(3f,0f,0f));
 		linyS = new Line(new Vector3f(0f,0f,0f), new Vector3f(0f,3f,0f));
@@ -111,6 +112,7 @@ public class MyGame extends VariableFrameRateGame
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
 		wood = new TextureImage("wood.png");
+		hammerTx = new TextureImage("hammerTx.jpg");
 	}
 
 	@Override
@@ -155,6 +157,13 @@ public class MyGame extends VariableFrameRateGame
 		bat.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(.05f, .05f, .05f);
 		bat.setLocalScale(initialScale);
+
+		//build hammer
+		hammer = new GameObject(GameObject.root(), hammerS, hammerTx);
+		initialTranslation = (new Matrix4f()).translation(0f,1f,1f);
+		hammer.setLocalTranslation(initialTranslation);
+		initialScale = (new Matrix4f()).scaling(.1f, .1f, .1f);
+		hammer.setLocalScale(initialScale);
 
 		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));
 		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(90.0f));
