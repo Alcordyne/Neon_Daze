@@ -110,7 +110,7 @@ public class MyGame extends VariableFrameRateGame
 		ghostT = new TextureImage("redPandaTx.png");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
-		wood = new TextureImage("wood.jpg");
+		wood = new TextureImage("wood.png");
 	}
 
 	@Override
@@ -155,7 +155,11 @@ public class MyGame extends VariableFrameRateGame
 		bat.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(.05f, .05f, .05f);
 		bat.setLocalScale(initialScale);
-		initialRotation = (new Matrix4f()).rotationY((float) Math.toRadians(-90.0f));
+
+		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));
+		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(90.0f));
+
+		initialRotation = new Matrix4f().mul(rotationY).mul(rotationX);
 		bat.setLocalRotation(initialRotation);
 
 	}
