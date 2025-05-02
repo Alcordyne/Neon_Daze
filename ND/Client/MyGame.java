@@ -54,14 +54,14 @@ public class MyGame extends VariableFrameRateGame
 	private float zoom = 1.0f;
 	private String counterStr = "";
 
-	private GameObject avatar,terr, bat,hammer, x,y,z;
+	private GameObject avatar,npc,terr, bat,hammer, x,y,z;
 	private ObjShape terrS,linxS,linyS,linzS, batS,hammerS;
-	private TextureImage avatartx, ghostT, hmap, ground, wood,hammerTx;
+	private TextureImage avatartx,npctx, ghostT, hmap, ground, wood,hammerTx;
 
 	private IAudioManager audioMgr;
 	private Sound swingSound;
 
-	private  AnimatedShape avatarS, ghostS;
+	private  AnimatedShape avatarS, ghostS,npcS;
 
 	public static MyGame game;
 
@@ -105,6 +105,8 @@ public class MyGame extends VariableFrameRateGame
 	public void loadShapes()
 	{	avatarS = new AnimatedShape("panda.rkm", "panda.rks");
 		avatarS.loadAnimation("RUN", "panda.rka");
+		npcS = new AnimatedShape("panda.rkm", "panda.rks");
+		npcS.loadAnimation("RUN", "panda.rka");
 		ghostS = new AnimatedShape("panda.rkm", "panda.rks");
 		ghostS.loadAnimation("RUN", "panda.rka");
 		batS = new ImportedModel("bat.obj");
@@ -119,6 +121,7 @@ public class MyGame extends VariableFrameRateGame
 	public void loadTextures()
 	{
 		avatartx = new TextureImage("pandatx.jpg");
+		npctx = new TextureImage("redPandaTx.png");
 		ghostT = new TextureImage("redPandaTx.png");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
@@ -151,6 +154,19 @@ public class MyGame extends VariableFrameRateGame
 		Matrix4f initialRotation = (new Matrix4f()).rotationX((float) Math.toRadians(0.0f));
 		avatar.setLocalRotation(initialRotation);
 
+		// build npc in the view of the window
+		npc = new GameObject(GameObject.root(), npcS, npctx);
+		initialTranslation = (new Matrix4f()).translation(8f,.5f,9f);
+		initialScale = (new Matrix4f()).scaling(1f, 1f, 1f);
+		Matrix4f NrotationY = new Matrix4f().rotationY((float) Math.toRadians(210f));
+		Matrix4f NrotationX = new Matrix4f().rotationX((float) Math.toRadians(0f));
+
+		initialRotation = new Matrix4f().mul(NrotationY).mul(NrotationX);
+
+		npc.setLocalScale(initialScale);
+		npc.setLocalTranslation(initialTranslation);
+		npc.setLocalRotation(initialRotation);
+
 		// build terrain object
 		terr = new GameObject(GameObject.root(), terrS, ground);
 		initialTranslation = (new Matrix4f()).translation(0f,0f,0f);
@@ -170,8 +186,8 @@ public class MyGame extends VariableFrameRateGame
 		bat.setLocalScale(initialScale);
 
 		//build hammer
-		hammer = new GameObject(GameObject.root(), hammerS, hammerTx);
-		initialTranslation = (new Matrix4f()).translation(0f,1f,1f);
+		hammer = new GameObject(npc, hammerS, hammerTx);
+		initialTranslation = (new Matrix4f()).translation(-.15f,.1f,0f);
 		hammer.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(.1f, .1f, .1f);
 		hammer.setLocalScale(initialScale);
@@ -516,4 +532,3 @@ public class MyGame extends VariableFrameRateGame
 		}
 	}
 }
-
