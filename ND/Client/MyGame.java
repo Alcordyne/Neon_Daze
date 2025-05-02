@@ -46,7 +46,7 @@ public class MyGame extends VariableFrameRateGame
 	private boolean isClientConnected = false;
 
 	public boolean axis = true;
-	private boolean gameOver = false;
+	private boolean gameOver,npcR = false;
 	private double lastFrameTime, currFrameTime, elapsTime;
 
 	private int horizons;
@@ -366,6 +366,20 @@ public class MyGame extends VariableFrameRateGame
 			CameraOverhead();
 			processNetworking((float)deltaTime);
 		}
+
+		if (npcR) {
+			Vector3f npcPos = npc.getWorldLocation();
+			Vector3f avatarPos = avatar.getWorldLocation();
+			float distance = npcPos.distance(avatarPos);
+			npcS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+			if (distance > 0.15f && distance <= 6.0f) {
+				Vector3f direction = new Vector3f(avatarPos).sub(npcPos).normalize();
+				float speed = 0.08f;
+				direction.mul(speed);
+				Vector3f newPos = new Vector3f(npcPos).add(direction);
+				npc.setLocalLocation(newPos);
+			}
+		}
 	}
 
 	public GameObject getAvatar() { return avatar; }
@@ -421,6 +435,8 @@ public class MyGame extends VariableFrameRateGame
     audioMgr.getEar().setOrientation(cam.getN(), new Vector3f(0,1,0));
 	}
 
+
+
 	private void createAxis() {
 		x = new GameObject(GameObject.root(), linxS);
 		y = new GameObject(GameObject.root(), linyS);
@@ -458,6 +474,9 @@ public class MyGame extends VariableFrameRateGame
 				setEarParameters();
 				swingSound.play();
 				}
+				break;
+			case KeyEvent.VK_C: // Toggle axis
+				npcR = !npcR;
 				break;
 
 			case KeyEvent.VK_Z: // Toggle axis
