@@ -1,6 +1,7 @@
 package ND.Client;
 
 import tage.*;
+import tage.audio.*;
 import tage.input.action.AbstractInputAction;
 import tage.input.action.BckAction;
 import tage.input.action.FwdAction;
@@ -22,6 +23,7 @@ import net.java.games.input.Component.Identifier.*;
 import tage.networking.IGameConnection.ProtocolType;
 
 import org.joml.*;
+
 import tage.nodeControllers.*;
 
 /*Things to do: Stage design basic temple in middle pyramid floating in sky,
@@ -53,8 +55,15 @@ public class MyGame extends VariableFrameRateGame
 	private String counterStr = "";
 
 	private GameObject avatar,terr, bat,hammer, x,y,z;
-	private ObjShape avatarS, ghostS, terrS,linxS,linyS,linzS, batS,hammerS;
+	private ObjShape terrS,linxS,linyS,linzS, batS,hammerS;
 	private TextureImage avatartx, ghostT, hmap, ground, wood,hammerTx;
+
+	private IAudioManager audioMgr;
+	private Sound swingSound;
+
+	private  AnimatedShape avatarS, ghostS;
+
+	public static MyGame game;
 
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
@@ -65,7 +74,7 @@ public class MyGame extends VariableFrameRateGame
 			this.serverProtocol = ProtocolType.UDP;
 	}
 	public static void main(String[] args)
-	{	MyGame game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
+	{	game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
 		engine = new Engine(game);
 		game.initializeSystem();
 		game.game_loop();
@@ -94,8 +103,10 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void loadShapes()
-	{	avatarS = new ImportedModel("panda.obj");
-		ghostS = new ImportedModel("panda.obj");
+	{	avatarS = new AnimatedShape("panda.rkm", "panda.rks");
+		avatarS.loadAnimation("RUN", "panda.rka");
+		ghostS = new AnimatedShape("panda.rkm", "panda.rks");
+		ghostS.loadAnimation("RUN", "panda.rka");
 		batS = new ImportedModel("bat.obj");
 		hammerS = new ImportedModel("hammer.obj");
 		terrS = new TerrainPlane(400);
@@ -134,10 +145,10 @@ public class MyGame extends VariableFrameRateGame
 		// build avatar in the center of the window
 		avatar = new GameObject(GameObject.root(), avatarS, avatartx);
 		initialTranslation = (new Matrix4f()).translation(0f,0f,0f);
-		initialScale = (new Matrix4f()).scaling(.6f, .6f, .6f);
+		initialScale = (new Matrix4f()).scaling(1f, 1f, 1f);
 		avatar.setLocalScale(initialScale);
 		avatar.setLocalTranslation(initialTranslation);
-		Matrix4f initialRotation = (new Matrix4f()).rotationY((float) Math.toRadians(0.0f));
+		Matrix4f initialRotation = (new Matrix4f()).rotationX((float) Math.toRadians(0.0f));
 		avatar.setLocalRotation(initialRotation);
 
 		// build terrain object
@@ -182,6 +193,19 @@ public class MyGame extends VariableFrameRateGame
 		(engine.getSceneGraph()).addLight(glight);
 
 	}
+
+	@Override
+	public void loadSounds()
+	{ 
+		AudioResource resource1;
+		audioMgr = engine.getAudioManager();
+		resource1 = audioMgr.createAudioResource("swing_mono.wav", AudioResourceType.AUDIO_SAMPLE);
+		swingSound = new Sound(resource1, SoundType.SOUND_EFFECT, 100, false);
+		swingSound.initialize(audioMgr);
+		swingSound.setMaxDistance(10.0f);
+		swingSound.setMinDistance(0.5f);
+		swingSound.setRollOff(5.0f);
+	}
 	@Override
 	public void loadSkyBoxes()
 	{ 	horizons = (engine.getSceneGraph()).loadCubeMap("horizons");
@@ -197,6 +221,10 @@ public class MyGame extends VariableFrameRateGame
 		(engine.getRenderSystem()).setWindowDimensions(1900,1000);
 
 		setupNetworking();
+
+		swingSound.setLocation(avatar.getWorldLocation());
+		setEarParameters();
+		swingSound.play();
 
 		// ------------ set up node controller --------------
 		rc = new RotationController(engine, new Vector3f(0,1,0), 0.01f);
@@ -308,6 +336,9 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f hud1Color = new Vector3f(1, 0, 0);
 		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 15, 15);
 
+		avatarS.updateAnimation();
+		setEarParameters(); 
+
 
 		if (!gameOver) {
 			long currentTime = System.currentTimeMillis();
@@ -366,6 +397,14 @@ public class MyGame extends VariableFrameRateGame
 		// Make the camera look at the avatar
 		rightCamera.lookAt(new Vector3f(avatarPos.x + panX, 0, avatarPos.z + panY));
 	}
+
+	public void setEarParameters()
+	{ 
+    Camera cam = engine.getRenderSystem().getViewport("LEFT").getCamera();
+    audioMgr.getEar().setLocation(cam.getLocation());
+    audioMgr.getEar().setOrientation(cam.getN(), new Vector3f(0,1,0));
+	}
+
 	private void createAxis() {
 		x = new GameObject(GameObject.root(), linxS);
 		y = new GameObject(GameObject.root(), linyS);
@@ -396,11 +435,14 @@ public class MyGame extends VariableFrameRateGame
 		Matrix4f initialTranslation, initialScale;
 		switch (e.getKeyCode())
 		{
-			case KeyEvent.VK_SPACE: // Disarm
-			{
+			case KeyEvent.VK_SPACE: 
+				for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
+				swingSound.stop();
+				swingSound.setLocation( ghost.getWorldLocation() );
+				setEarParameters();
+				swingSound.play();
 				}
 				break;
-
 
 			case KeyEvent.VK_Z: // Toggle axis
 				axis = !axis;
@@ -409,15 +451,29 @@ public class MyGame extends VariableFrameRateGame
 				} else {
 					hideAxis(); // Hide axis lines
 				}
+
+				break;
+
+			case KeyEvent.VK_W:
+				avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
 				break;
 
 		}
 		super.keyPressed(e);
 	}
 
-	// ---------- NETWORKING SECTION ----------------
+	@Override
+	public void keyReleased(KeyEvent e) {
+		super.keyReleased(e);
+		if (e.getKeyCode() == KeyEvent.VK_W) {
+			avatarS.stopAnimation();
+		}
+	}
 
-	public ObjShape getGhostShape() { return ghostS; }
+
+	// ---------- NETWORKING SECTION ----------------
+	public AnimatedShape getAvatarShape() { return avatarS; }
+	public AnimatedShape getGhostShape() { return ghostS; }
 	public TextureImage getGhostTexture() { return ghostT; }
 	public GhostManager getGhostManager() { return gm; }
 	public static Engine getEngine() { return engine; }

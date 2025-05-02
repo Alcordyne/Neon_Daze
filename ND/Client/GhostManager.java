@@ -3,12 +3,14 @@ package ND.Client;
 import java.awt.Color;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.Vector;
 import org.joml.*;
 
 import tage.*;
+import tage.shapes.AnimatedShape;
 
 public class GhostManager
 {
@@ -21,10 +23,11 @@ public class GhostManager
 	
 	public void createGhostAvatar(UUID id, Vector3f position) throws IOException
 	{	System.out.println("adding ghost with ID --> " + id);
-		ObjShape s = game.getGhostShape();
+ 		AnimatedShape s = game.getGhostShape();
+    	s.loadAnimation("RUN","panda.rka");
 		TextureImage t = game.getGhostTexture();
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
-		Matrix4f initialScale = (new Matrix4f()).scaling(.6f);
+		Matrix4f initialScale = (new Matrix4f()).scaling(1f);
 		newAvatar.setLocalScale(initialScale);
 		ghostAvatars.add(newAvatar);
 	}
@@ -82,5 +85,11 @@ public class GhostManager
 		{
 			System.out.println("tried to update ghost avatar rotation, but unable to find ghost in list");
 		}
+	}
+	public GhostAvatar getGhostAvatar(UUID id) {
+    	return findAvatar(id);             
+	}
+	public Collection<GhostAvatar> getAllGhostAvatars() {
+		return ghostAvatars;
 	}
 }
