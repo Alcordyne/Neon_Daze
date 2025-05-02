@@ -24,7 +24,7 @@ public class GhostManager
 	public void createGhostAvatar(UUID id, Vector3f position) throws IOException
 	{	System.out.println("adding ghost with ID --> " + id);
  		AnimatedShape s = game.getGhostShape();
-    	s.loadAnimation("RUN","bigtime2.rka");
+    	s.loadAnimation("RUN","panda.rka");
 		TextureImage t = game.getGhostTexture();
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
 		Matrix4f initialScale = (new Matrix4f()).scaling(1f);
