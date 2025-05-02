@@ -16,9 +16,10 @@ public class FwdAction extends AbstractInputAction
     private float speed = 6.0f;
     
 	public FwdAction(MyGame g, ProtocolClient p)
-	{	game = g;
+	{	
+        game = g;
 		protClient = p;
-        }
+    }
 
     @Override
     public void performAction(float time, Event e)
