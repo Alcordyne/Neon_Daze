@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.net.InetAddress;
 
 import java.net.UnknownHostException;
+
 import net.java.games.input.*;
 import net.java.games.input.Component.Identifier.*;
 import tage.networking.IGameConnection.ProtocolType;
@@ -37,6 +38,8 @@ hazard controller, character moves, custom models
 */
 public class MyGame extends VariableFrameRateGame
 {
+	
+	public static MyGame game;
 	private static Engine engine;
 	private InputManager im;
 	private NodeController rc,ocs;
@@ -55,7 +58,7 @@ public class MyGame extends VariableFrameRateGame
 	private ProtocolClient protClient;
 	private boolean isClientConnected = false;
 
-	public boolean axis = true;
+	public boolean axis, physicsLines;
 	private boolean gameOver,npcR = false;
 	private double lastFrameTime, currFrameTime, elapsTime;
 
@@ -73,7 +76,8 @@ public class MyGame extends VariableFrameRateGame
 
 	private  AnimatedShape avatarS, ghostS,npcS;
 
-	public static MyGame game;
+	private float cRadius;
+	private float cHeight;
 
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
@@ -122,9 +126,9 @@ public class MyGame extends VariableFrameRateGame
 		batS = new ImportedModel("bat.obj");
 		hammerS = new ImportedModel("hammer.obj");
 		terrS = new TerrainPlane(400);
-		linxS = new Line(new Vector3f(0f,0f,0f), new Vector3f(3f,0f,0f));
-		linyS = new Line(new Vector3f(0f,0f,0f), new Vector3f(0f,3f,0f));
-		linzS = new Line(new Vector3f(0f,0f,0f), new Vector3f(0f,0f,-3f));
+		linxS = new Line(new Vector3f(0f,0.5f,0f), new Vector3f(5f,0.5f,0f));
+		linyS = new Line(new Vector3f(0f,0.5f,0f), new Vector3f(0f,5.5f,0f));
+		linzS = new Line(new Vector3f(0f,0.5f,0f), new Vector3f(0f,0.5f,-5f));
 	}
 
 	@Override
@@ -156,7 +160,7 @@ public class MyGame extends VariableFrameRateGame
 		// build avatar in the center of the window
 		avatar = new GameObject(GameObject.root(), avatarS, avatartx);
 		initialTranslation = (new Matrix4f()).translation(0f,0f,0f);
-		initialScale = (new Matrix4f()).scaling(1f, 1f, 1f);
+		initialScale = (new Matrix4f()).scaling(.6f, .6f, .6f);
 		avatar.setLocalScale(initialScale);
 		avatar.setLocalTranslation(initialTranslation);
 		Matrix4f initialRotation = (new Matrix4f()).rotationX((float) Math.toRadians(0.0f));
@@ -165,7 +169,7 @@ public class MyGame extends VariableFrameRateGame
 		// build npc in the view of the window
 		npc = new GameObject(GameObject.root(), npcS, npctx);
 		initialTranslation = (new Matrix4f()).translation(8f,.5f,9f);
-		initialScale = (new Matrix4f()).scaling(1f, 1f, 1f);
+		initialScale = (new Matrix4f()).scaling(.6f, .6f, .6f);
 		Matrix4f NrotationY = new Matrix4f().rotationY((float) Math.toRadians(210f));
 		Matrix4f NrotationX = new Matrix4f().rotationX((float) Math.toRadians(0f));
 
@@ -201,7 +205,7 @@ public class MyGame extends VariableFrameRateGame
 		hammer.setLocalScale(initialScale);
 
 		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));
-		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(90.0f));
+		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(-90.0f));
 
 		initialRotation = new Matrix4f().mul(rotationY).mul(rotationX);
 		bat.setLocalRotation(initialRotation);
@@ -267,50 +271,38 @@ public class MyGame extends VariableFrameRateGame
 		Camera c = (engine.getRenderSystem()).getViewport("LEFT").getCamera();
 
 		// --- initialize physics system ---
-		float[] gravity = {0f, 0f, 10f};
-		physicsEngine = (engine.getSceneGraph()).getPhysicsEngine();
-		physicsEngine.setGravity(gravity);
-		// --- create physics world ---
-		float mass = .5f;
-		float up[] = {0, 0, 1};
-		float radius = 0.5f;
-		float height = 1.0f;
-		double[] tempTransform;
+		physicsEngine = engine.getSceneGraph().getPhysicsEngine();
+		physicsEngine.setGravity(new float[]{0f, -10f, 0f});
 
-// Get the NPC's current position
-		Matrix4f translation = new Matrix4f(npc.getLocalTranslation());
+		float mass    = 0.5f;
+		cRadius       = 0.5f;
+		cHeight       = 1.0f;
 
-// Apply rotation to orient capsule upright
-		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(270.0f));
-		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(90.0f));
-		Matrix4f rotation = new Matrix4f().mul(rotationY).mul(rotationX);
+		float yOffset = .5f;
 
-// Combine rotation with translation
-		Matrix4f transform = new Matrix4f().mul(translation).mul(rotation);
+		Vector3f npcPos = npc.getWorldLocation();
 
-// Convert matrix to double array for physics engine
-		tempTransform = toDoubleArray(transform.get(vals));
+		Matrix4f capsuleXform = new Matrix4f().translation(npcPos.x, npcPos.y + yOffset, npcPos.z);
 
-// Create physics capsule
-		caps1P = (engine.getSceneGraph()).addPhysicsCapsuleX(
-				mass, tempTransform, radius, height);
-		//caps1P.setBounciness(1f);
+		double[] tempTransform = toDoubleArray(capsuleXform.get(vals));
+		caps1P = engine.getSceneGraph().addPhysicsCapsule(mass, tempTransform, cRadius, cHeight);
 
-// Attach capsule to NPC
+		//lock rotation
 		npc.setPhysicsObject(caps1P);
+		JBulletPhysicsObject jbo = (JBulletPhysicsObject)caps1P;
+		jbo.getRigidBody().setAngularFactor(0f);
 
-// Store avatar transform for later use
-		translation = new Matrix4f(avatar.getLocalTranslation());
-		tempTransform = toDoubleArray(translation.get(vals));
-
-		translation = new Matrix4f(terr.getLocalTranslation());
-		tempTransform = toDoubleArray(translation.get(vals));
-		planeP = (engine.getSceneGraph()).addPhysicsStaticPlane(
-				tempTransform, up, 0.0f);
-		planeP.setBounciness(1.0f);
+		// --- now create the static floor plane underneath ---
+		float[] up = {0f, 1f, 0f};
+		Matrix4f planeXform = new Matrix4f().translation(0f, 0f, 0f);
+		double[] planeTrans = toDoubleArray(planeXform.get(vals));
+		planeP = engine.getSceneGraph()
+				.addPhysicsStaticPlane(planeTrans, up, 0f);
+		planeP.setBounciness(1f);
 		terr.setPhysicsObject(planeP);
-		engine.enableGraphicsWorldRender();
+
 		engine.enablePhysicsWorldRender();
+
 
         // ----------------- OTHER INPUTS SECTION -----------------------------
 		FwdAction fwdAction = new FwdAction(this, protClient);
@@ -435,30 +427,43 @@ public class MyGame extends VariableFrameRateGame
 			checkForCollisions();
 			physicsEngine.update((float)elapsedTime);
 			for (GameObject go:engine.getSceneGraph().getGameObjects())
-			{ if (go.getPhysicsObject() != null)
-			{ // set translation
-				mat.set(toFloatArray(go.getPhysicsObject().getTransform()));
-				mat2.set(3,0,mat.m30());
-				mat2.set(3,1,mat.m31());
-				mat2.set(3,2,mat.m32());
-				go.setLocalTranslation(mat2);
-// set rotation
-				mat.getRotation(aa);
-				mat3.rotation(aa);
-				go.setLocalRotation(mat3);
-			} } }
+			{ 
+				if (go.getPhysicsObject() != null)
+				{ 
+					// set translation
+					mat.set(toFloatArray(go.getPhysicsObject().getTransform()));
+					mat2.set(3,0,mat.m30());
+					mat2.set(3,1,mat.m31());
+					mat2.set(3,2,mat.m32());
+					go.setLocalTranslation(mat2);
+
+					// set rotation
+					mat.getRotation(aa);
+					mat3.rotation(aa);
+					go.setLocalRotation(mat3);
+				} 
+			} 
+		}
 
 		if (npcR) {
 			Vector3f npcPos = npc.getWorldLocation();
 			Vector3f avatarPos = avatar.getWorldLocation();
 			float distance = npcPos.distance(avatarPos);
 			npcS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
-			if (distance > 0.15f && distance <= 6.0f) {
+			if (distance > 0.15f && distance <= 15.0f) {
 				Vector3f direction = new Vector3f(avatarPos).sub(npcPos).normalize();
-				float speed = 0.08f;
+				float speed = 0.02f;
 				direction.mul(speed);
 				Vector3f newPos = new Vector3f(npcPos).add(direction);
 				npc.setLocalLocation(newPos);
+				npc.lookAt(avatar);
+
+				//move capsule
+				//Vector3f worldPos = npc.getWorldLocation();
+				//float yOffset = (cHeight / 2f) + cRadius;
+				//Matrix4f physicsMat = new Matrix4f().translation(worldPos.x, worldPos.y + yOffset, worldPos.z);
+				//physicsMat.get(vals);
+				//caps1P.setTransform(toDoubleArray(vals));
 			}
 		}
 	}
@@ -606,41 +611,44 @@ public class MyGame extends VariableFrameRateGame
 				break;
 
 			case KeyEvent.VK_P: // Toggle physics
-				System.out.println("starting physics");
 				running = !running;
 				break;
 
 			case KeyEvent.VK_Q:
+				swingSound.stop();
+				swingSound.setLocation( avatar.getWorldLocation() );
+				setEarParameters();
+				swingSound.play();
 				if (caps1P != null) {
-					Vector3f npcPos = npc.getWorldLocation();
+					// compute knockback direction
+					Vector3f npcPos    = npc.getWorldLocation();
 					Vector3f avatarPos = avatar.getWorldLocation();
+					Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
+					float horizontalStrength = 5.0f;
+					float upwardStrength     = 5.0f;   
 
-					Vector3f knockbackDir = new Vector3f();
-					knockbackDir.sub(npcPos, avatarPos);  // Direction from avatar to NPC
+					// build final velocity
+					float vx = kbDir.x * horizontalStrength;
+					float vz = kbDir.z * horizontalStrength;
+					float vy = upwardStrength;
 
-					if (knockbackDir.length() > 0) {
-						knockbackDir.normalize();
-						float knockbackStrength = 10.0f;
-						knockbackDir.x *= knockbackStrength;
-						knockbackDir.y *= knockbackStrength;
-						knockbackDir.z *= knockbackStrength;
-
-						float[] knockbackVelocity = new float[] {
-								knockbackDir.x, knockbackDir.y, knockbackDir.z
-						};
-						caps1P.setLinearVelocity(knockbackVelocity);
-						System.out.println("Knockback velocity set on ghost.");
-					}
+					caps1P.setLinearVelocity(new float[]{ vx, vy, vz });
 				}
 				break;
-			case KeyEvent.VK_Z: // Toggle axis
-				axis = !axis;
-				if (axis) {
-					createAxis(); // Create axis lines
-				} else {
-					hideAxis(); // Hide axis lines
-				}
 
+			case KeyEvent.VK_Z: // Toggle axis and physics lines
+				axis = !axis;
+				physicsLines = !physicsLines;
+				if (axis) {
+					createAxis(); 
+				} else {
+					hideAxis(); 
+				}
+				if(physicsLines){
+					engine.enablePhysicsWorldRender();
+				} else{
+					engine.disablePhysicsWorldRender();
+				}
 				break;
 
 			case KeyEvent.VK_W:
