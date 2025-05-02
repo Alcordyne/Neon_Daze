@@ -26,6 +26,12 @@ import org.joml.*;
 
 import tage.nodeControllers.*;
 
+import tage.physics.PhysicsEngine;
+import tage.physics.PhysicsObject;
+import tage.physics.JBullet.*;
+import com.bulletphysics.dynamics.RigidBody;
+import com.bulletphysics.collision.dispatch.CollisionObject;
+
 /*Things to do: Stage design basic temple in middle pyramid floating in sky,
 deathplane, jump controller, swing controller, custom neon skybox, environmental hazards,
 hazard controller, character moves, custom models
@@ -37,6 +43,12 @@ public class MyGame extends VariableFrameRateGame
 	private InputManager im;
 	private NodeController rc,ocs;
 	private Light glight;
+
+	private PhysicsEngine physicsEngine;
+	private PhysicsObject caps1P, caps2P, planeP;
+
+	private boolean running = false;
+	private float vals[] = new float[16];
 
 	private GhostManager gm;
 	private String serverAddress;
@@ -142,8 +154,6 @@ public class MyGame extends VariableFrameRateGame
 			(y.getRenderStates()).setColor(new Vector3f(0f, 1f, 0f));
 			(z.getRenderStates()).setColor(new Vector3f(0f, 0f, 1f));
 		}
-
-
 
 		// build avatar in the center of the window
 		avatar = new GameObject(GameObject.root(), avatarS, avatartx);
@@ -258,6 +268,33 @@ public class MyGame extends VariableFrameRateGame
 		String gpName = im.getFirstGamepadName();
 		Camera c = (engine.getRenderSystem()).getViewport("LEFT").getCamera();
 
+		// --- initialize physics system ---
+		float[] gravity = {0f, -5f, 0f};
+		physicsEngine = (engine.getSceneGraph()).getPhysicsEngine();
+		physicsEngine.setGravity(gravity);
+		// --- create physics world ---
+		float mass = 1.0f;
+		float up[ ] = {0,1,0};
+		float radius = 0.75f;
+		float height = 2.0f;
+		double[ ] tempTransform;
+		Matrix4f translation = new Matrix4f(npc.getLocalTranslation());
+		tempTransform = toDoubleArray(translation.get(vals));
+		caps1P = (engine.getSceneGraph()).addPhysicsCapsuleX(
+				mass, tempTransform, radius, height);
+		caps1P.setBounciness(0.8f);
+		npc.setPhysicsObject(caps1P);
+		translation = new Matrix4f(avatar.getLocalTranslation());
+		tempTransform = toDoubleArray(translation.get(vals));
+
+		translation = new Matrix4f(terr.getLocalTranslation());
+		tempTransform = toDoubleArray(translation.get(vals));
+		planeP = (engine.getSceneGraph()).addPhysicsStaticPlane(
+				tempTransform, up, 0.0f);
+		planeP.setBounciness(1.0f);
+		terr.setPhysicsObject(planeP);
+		engine.enableGraphicsWorldRender();
+		engine.enablePhysicsWorldRender();
 
         // ----------------- OTHER INPUTS SECTION -----------------------------
 		FwdAction fwdAction = new FwdAction(this, protClient);
@@ -265,23 +302,23 @@ public class MyGame extends VariableFrameRateGame
 		TurnAction turnAction = new TurnAction(this, protClient);
 
 			im.associateActionWithAllKeyboards(
-					net.java.games.input.Component.Identifier.Key.W, fwdAction,
+					Key.W, fwdAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 					protClient.sendMoveMessage(avatar.getWorldLocation());
 			im.associateActionWithAllKeyboards(
-					net.java.games.input.Component.Identifier.Key.S, bckAction,
+					Key.S, bckAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 					protClient.sendMoveMessage(avatar.getWorldLocation());
 			im.associateActionWithAllKeyboards(
-					net.java.games.input.Component.Identifier.Key.A, turnAction,
+					Key.A, turnAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 			im.associateActionWithAllKeyboards(
-					net.java.games.input.Component.Identifier.Key.D, turnAction,
+					Key.D, turnAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 
 		// Zooming in and out HUD 2
 		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.UP, (time, e) -> {
+				Key.UP, (time, e) -> {
 					zoom -= 0.1f; // Zoom in
 					if (zoom < 0.25f) zoom = 0.25f; // Minimum zoom level
 				},
@@ -289,7 +326,7 @@ public class MyGame extends VariableFrameRateGame
 		);
 
 		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.DOWN, (time, e) -> {
+				Key.DOWN, (time, e) -> {
 					zoom += 0.1f; // Zoom out
 					if (zoom > 2.0f) zoom = 2.0f; // Maximum zoom level
 				},
@@ -298,21 +335,21 @@ public class MyGame extends VariableFrameRateGame
 
 		// Panning left and right HUD 2
 		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.LEFT, (time, e) -> {
+				Key.LEFT, (time, e) -> {
 					panX -= 0.1f; // Pan left
 				},
 				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN
 		);
 
 		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.RIGHT, (time, e) -> {
+				Key.RIGHT, (time, e) -> {
 					panX += 0.1f; // Pan right
 				},
 				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN
 		);
 
 		im.associateActionWithAllGamepads(
-				net.java.games.input.Component.Identifier.Axis.X, (time, e) -> {
+				Axis.X, (time, e) -> {
 					float xValue = e.getValue();
 					if (xValue < 0) {
 						// Negative X: yaw left
@@ -330,7 +367,7 @@ public class MyGame extends VariableFrameRateGame
 				}, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 
 		im.associateActionWithAllGamepads(
-				net.java.games.input.Component.Identifier.Axis.Y, (time, e) -> {
+				Axis.Y, (time, e) -> {
 					// Perform action based on Y-axis (negative or positive)
 					float yValue = e.getValue();
 					if (yValue < 0) {
@@ -346,6 +383,13 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void update() {
+
+		long startTime = 0,elapsedTime,prevTime = 0,amt = 0;
+		double totalTime = System.currentTimeMillis() - startTime;
+		elapsedTime = System.currentTimeMillis() - prevTime;
+		prevTime = System.currentTimeMillis();
+
+
 
 		// HUD 1
 		String dispStr1 = counterStr;
@@ -367,6 +411,27 @@ public class MyGame extends VariableFrameRateGame
 			processNetworking((float)deltaTime);
 		}
 
+		if (running)
+		{ AxisAngle4f aa = new AxisAngle4f();
+			Matrix4f mat = new Matrix4f();
+			Matrix4f mat2 = new Matrix4f().identity();
+			Matrix4f mat3 = new Matrix4f().identity();
+			checkForCollisions();
+			physicsEngine.update((float)elapsedTime);
+			for (GameObject go:engine.getSceneGraph().getGameObjects())
+			{ if (go.getPhysicsObject() != null)
+			{ // set translation
+				mat.set(toFloatArray(go.getPhysicsObject().getTransform()));
+				mat2.set(3,0,mat.m30());
+				mat2.set(3,1,mat.m31());
+				mat2.set(3,2,mat.m32());
+				go.setLocalTranslation(mat2);
+// set rotation
+				mat.getRotation(aa);
+				mat3.rotation(aa);
+				go.setLocalRotation(mat3);
+			} } }
+
 		if (npcR) {
 			Vector3f npcPos = npc.getWorldLocation();
 			Vector3f avatarPos = avatar.getWorldLocation();
@@ -382,6 +447,51 @@ public class MyGame extends VariableFrameRateGame
 		}
 	}
 
+	private void checkForCollisions()
+	{ com.bulletphysics.dynamics.DynamicsWorld dynamicsWorld;
+		com.bulletphysics.collision.broadphase.Dispatcher dispatcher;
+		com.bulletphysics.collision.narrowphase.PersistentManifold manifold;
+		com.bulletphysics.dynamics.RigidBody object1, object2;
+		com.bulletphysics.collision.narrowphase.ManifoldPoint contactPoint;
+		dynamicsWorld =
+				((JBulletPhysicsEngine)physicsEngine).getDynamicsWorld();
+		dispatcher = dynamicsWorld.getDispatcher();
+		int manifoldCount = dispatcher.getNumManifolds();
+		for (int i=0; i<manifoldCount; i++)
+		{ manifold = dispatcher.getManifoldByIndexInternal(i);
+			object1 =
+					(com.bulletphysics.dynamics.RigidBody)manifold.getBody0();
+			object2 =
+					(com.bulletphysics.dynamics.RigidBody)manifold.getBody1();
+			JBulletPhysicsObject obj1 =
+					JBulletPhysicsObject.getJBulletPhysicsObject(object1);
+			JBulletPhysicsObject obj2 =
+					JBulletPhysicsObject.getJBulletPhysicsObject(object2);
+			for (int j = 0; j < manifold.getNumContacts(); j++)
+			{ contactPoint = manifold.getContactPoint(j);
+				if (contactPoint.getDistance() < 0.0f)
+				{ System.out.println("---- hit between " + obj1 + " and " + obj2);
+					break;
+				} } } }
+	// ------------------ UTILITY FUNCTIONS used by physics
+	private float[] toFloatArray(double[] arr)
+	{ if (arr == null) return null;
+		int n = arr.length;
+		float[] ret = new float[n];
+		for (int i = 0; i < n; i++)
+		{ ret[i] = (float)arr[i];
+		}
+		return ret;
+	}
+	private double[] toDoubleArray(float[] arr)
+	{ if (arr == null) return null;
+		int n = arr.length;
+		double[] ret = new double[n];
+		for (int i = 0; i < n; i++)
+		{ ret[i] = (double)arr[i];
+		}
+		return ret;
+	}
 	public GameObject getAvatar() { return avatar; }
 
 	public void avatarMove(){
@@ -475,10 +585,14 @@ public class MyGame extends VariableFrameRateGame
 				swingSound.play();
 				}
 				break;
-			case KeyEvent.VK_C: // Toggle axis
+			case KeyEvent.VK_C: // Toggle npc
 				npcR = !npcR;
 				break;
 
+			case KeyEvent.VK_P: // Toggle physics
+				System.out.println("starting physics");
+				running = true;
+				break;
 			case KeyEvent.VK_Z: // Toggle axis
 				axis = !axis;
 				if (axis) {
@@ -544,7 +658,7 @@ public class MyGame extends VariableFrameRateGame
 	
 	private class SendCloseConnectionPacketAction extends AbstractInputAction
 	{	@Override
-		public void performAction(float time, net.java.games.input.Event evt) 
+		public void performAction(float time, Event evt)
 		{	if(protClient != null && isClientConnected == true)
 			{	protClient.sendByeMessage();
 			}
