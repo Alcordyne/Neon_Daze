@@ -29,8 +29,6 @@ import tage.nodeControllers.*;
 import tage.physics.PhysicsEngine;
 import tage.physics.PhysicsObject;
 import tage.physics.JBullet.*;
-import com.bulletphysics.dynamics.RigidBody;
-import com.bulletphysics.collision.dispatch.CollisionObject;
 
 /*Things to do: Stage design basic temple in middle pyramid floating in sky,
 deathplane, jump controller, swing controller, custom neon skybox, environmental hazards,
@@ -269,21 +267,39 @@ public class MyGame extends VariableFrameRateGame
 		Camera c = (engine.getRenderSystem()).getViewport("LEFT").getCamera();
 
 		// --- initialize physics system ---
-		float[] gravity = {0f, -5f, 0f};
+		float[] gravity = {0f, 0f, 10f};
 		physicsEngine = (engine.getSceneGraph()).getPhysicsEngine();
 		physicsEngine.setGravity(gravity);
 		// --- create physics world ---
-		float mass = 1.0f;
-		float up[ ] = {0,1,0};
-		float radius = 0.75f;
-		float height = 2.0f;
-		double[ ] tempTransform;
+		float mass = .5f;
+		float up[] = {0, 0, 1};
+		float radius = 0.5f;
+		float height = 1.0f;
+		double[] tempTransform;
+
+// Get the NPC's current position
 		Matrix4f translation = new Matrix4f(npc.getLocalTranslation());
-		tempTransform = toDoubleArray(translation.get(vals));
+
+// Apply rotation to orient capsule upright
+		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(270.0f));
+		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(90.0f));
+		Matrix4f rotation = new Matrix4f().mul(rotationY).mul(rotationX);
+
+// Combine rotation with translation
+		Matrix4f transform = new Matrix4f().mul(translation).mul(rotation);
+
+// Convert matrix to double array for physics engine
+		tempTransform = toDoubleArray(transform.get(vals));
+
+// Create physics capsule
 		caps1P = (engine.getSceneGraph()).addPhysicsCapsuleX(
 				mass, tempTransform, radius, height);
-		caps1P.setBounciness(0.8f);
+		//caps1P.setBounciness(1f);
+
+// Attach capsule to NPC
 		npc.setPhysicsObject(caps1P);
+
+// Store avatar transform for later use
 		translation = new Matrix4f(avatar.getLocalTranslation());
 		tempTransform = toDoubleArray(translation.get(vals));
 
@@ -591,7 +607,31 @@ public class MyGame extends VariableFrameRateGame
 
 			case KeyEvent.VK_P: // Toggle physics
 				System.out.println("starting physics");
-				running = true;
+				running = !running;
+				break;
+
+			case KeyEvent.VK_Q:
+				if (caps1P != null) {
+					Vector3f npcPos = npc.getWorldLocation();
+					Vector3f avatarPos = avatar.getWorldLocation();
+
+					Vector3f knockbackDir = new Vector3f();
+					knockbackDir.sub(npcPos, avatarPos);  // Direction from avatar to NPC
+
+					if (knockbackDir.length() > 0) {
+						knockbackDir.normalize();
+						float knockbackStrength = 10.0f;
+						knockbackDir.x *= knockbackStrength;
+						knockbackDir.y *= knockbackStrength;
+						knockbackDir.z *= knockbackStrength;
+
+						float[] knockbackVelocity = new float[] {
+								knockbackDir.x, knockbackDir.y, knockbackDir.z
+						};
+						caps1P.setLinearVelocity(knockbackVelocity);
+						System.out.println("Knockback velocity set on ghost.");
+					}
+				}
 				break;
 			case KeyEvent.VK_Z: // Toggle axis
 				axis = !axis;
