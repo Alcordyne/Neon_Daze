@@ -27,7 +27,7 @@ public class GhostManager
     	s.loadAnimation("RUN","panda.rka");
 		TextureImage t = game.getGhostTexture();
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
-		Matrix4f initialScale = (new Matrix4f()).scaling(1f);
+		Matrix4f initialScale = (new Matrix4f()).scaling(.6f);
 		newAvatar.setLocalScale(initialScale);
 		ghostAvatars.add(newAvatar);
 	}
