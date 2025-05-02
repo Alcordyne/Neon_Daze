@@ -24,6 +24,12 @@ import tage.networking.IGameConnection.ProtocolType;
 import org.joml.*;
 import tage.nodeControllers.*;
 
+import tage.physics.PhysicsEngine;
+import tage.physics.PhysicsObject;
+import tage.physics.JBullet.*;
+import com.bulletphysics.dynamics.RigidBody;
+import com.bulletphysics.collision.dispatch.CollisionObject;
+
 /*Things to do: Stage design basic temple in middle pyramid floating in sky,
 deathplane, jump controller, swing controller, custom neon skybox, environmental hazards,
 hazard controller, character moves, custom models
@@ -35,6 +41,11 @@ public class MyGame extends VariableFrameRateGame
 	private InputManager im;
 	private NodeController rc,ocs;
 	private Light glight;
+
+	private PhysicsEngine physicsEngine;
+	private PhysicsObject caps1P, caps2P, planeP;
+
+	private float vals[] = new float[16];
 
 	private GhostManager gm;
 	private String serverAddress;
@@ -198,6 +209,34 @@ public class MyGame extends VariableFrameRateGame
 
 		setupNetworking();
 
+		// --- initialize physics system ---
+		float[] gravity = {0f, -5f, 0f};
+		physicsEngine = (engine.getSceneGraph()).getPhysicsEngine();
+		physicsEngine.setGravity(gravity);
+		// --- create physics world ---
+		float mass = 1.0f;
+		float up[ ] = {0,1,0};
+		float radius = 0.75f;
+		float height = 2.0f;
+		double[ ] tempTransform;
+
+		Matrix4f translation = new Matrix4f(avatar.getLocalTranslation());
+		tempTransform = toDoubleArray(translation.get(vals));
+		caps1P = (engine.getSceneGraph()).addPhysicsCapsuleX(
+				mass, tempTransform, radius, height);
+		caps1P.setBounciness(0.8f);
+		avatar.setPhysicsObject(caps1P);
+
+		translation = new Matrix4f(terr.getLocalTranslation());
+		tempTransform = toDoubleArray(translation.get(vals));
+		planeP = (engine.getSceneGraph()).addPhysicsStaticPlane(
+				tempTransform, up, 0.0f);
+		planeP.setBounciness(1.0f);
+
+		terr.setPhysicsObject(planeP);
+		engine.enableGraphicsWorldRender();
+		engine.enablePhysicsWorldRender();
+
 		// ------------ set up node controller --------------
 		rc = new RotationController(engine, new Vector3f(0,1,0), 0.01f);
 		(engine.getSceneGraph()).addNodeController(rc);
@@ -313,7 +352,8 @@ public class MyGame extends VariableFrameRateGame
 			long currentTime = System.currentTimeMillis();
 			double deltaTime = (currentTime - lastFrameTime) / 1000.0; // seconds
 			lastFrameTime = currentTime;
-			
+
+
 			im.update((float)deltaTime);
 			avatarMove();
 			CameraOverhead();
@@ -388,6 +428,52 @@ public class MyGame extends VariableFrameRateGame
 			z.getParent().removeChild(z);
 			z = null;
 		}
+	}
+	private void checkForCollisions()
+	{ com.bulletphysics.dynamics.DynamicsWorld dynamicsWorld;
+		com.bulletphysics.collision.broadphase.Dispatcher dispatcher;
+		com.bulletphysics.collision.narrowphase.PersistentManifold manifold;
+		com.bulletphysics.dynamics.RigidBody object1, object2;
+		com.bulletphysics.collision.narrowphase.ManifoldPoint contactPoint;
+		dynamicsWorld =
+				((JBulletPhysicsEngine)physicsEngine).getDynamicsWorld();
+		dispatcher = dynamicsWorld.getDispatcher();
+		int manifoldCount = dispatcher.getNumManifolds();
+		for (int i=0; i<manifoldCount; i++)
+		{ manifold = dispatcher.getManifoldByIndexInternal(i);
+			object1 =
+					(com.bulletphysics.dynamics.RigidBody)manifold.getBody0();
+			object2 =
+					(com.bulletphysics.dynamics.RigidBody)manifold.getBody1();
+			JBulletPhysicsObject obj1 =
+					JBulletPhysicsObject.getJBulletPhysicsObject(object1);
+			JBulletPhysicsObject obj2 =
+					JBulletPhysicsObject.getJBulletPhysicsObject(object2);
+			for (int j = 0; j < manifold.getNumContacts(); j++)
+			{ contactPoint = manifold.getContactPoint(j);
+				if (contactPoint.getDistance() < 0.0f)
+				{ System.out.println("---- hit between " + obj1 + " and " + obj2);
+					break;
+				} } } }
+
+	// ------------------ UTILITY FUNCTIONS used by physics
+	private float[] toFloatArray(double[] arr)
+	{ if (arr == null) return null;
+		int n = arr.length;
+		float[] ret = new float[n];
+		for (int i = 0; i < n; i++)
+		{ ret[i] = (float)arr[i];
+		}
+		return ret;
+	}
+	private double[] toDoubleArray(float[] arr)
+	{ if (arr == null) return null;
+		int n = arr.length;
+		double[] ret = new double[n];
+		for (int i = 0; i < n; i++)
+		{ ret[i] = (double)arr[i];
+		}
+		return ret;
 	}
 
 	@Override
