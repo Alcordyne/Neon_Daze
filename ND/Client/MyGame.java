@@ -46,7 +46,7 @@ public class MyGame extends VariableFrameRateGame
 	private Light glight;
 
 	private PhysicsEngine physicsEngine;
-	private PhysicsObject caps1P, caps2P, planeP;
+	private PhysicsObject caps1P, caps2P, caps3P, planeP;
 
 	private boolean running = false;
 	private float vals[] = new float[16];
@@ -310,11 +310,9 @@ public class MyGame extends VariableFrameRateGame
 		cRadius       = 0.5f;
 		cHeight       = 1.0f;
 
-		float yOffset = .5f;
-
 		Vector3f npcPos = npc.getWorldLocation();
 
-		Matrix4f capsuleXform = new Matrix4f().translation(npcPos.x, npcPos.y + yOffset, npcPos.z);
+		Matrix4f capsuleXform = new Matrix4f().translation(npcPos.x, npcPos.y, npcPos.z);
 
 		double[] tempTransform = toDoubleArray(capsuleXform.get(vals));
 		caps1P = engine.getSceneGraph().addPhysicsCapsule(mass, tempTransform, cRadius, cHeight);
@@ -323,6 +321,16 @@ public class MyGame extends VariableFrameRateGame
 		npc.setPhysicsObject(caps1P);
 		JBulletPhysicsObject jbo = (JBulletPhysicsObject)caps1P;
 		jbo.getRigidBody().setAngularFactor(0f);
+
+		//Player physics obj
+		Vector3f avPos  = avatar.getWorldLocation();
+		// offset up by half your capsule’s height so it sits on the floor
+		Matrix4f avXform = new Matrix4f().translation(avPos.x, avPos.y, avPos.z);
+		caps2P = engine.getSceneGraph()
+					.addPhysicsCapsule(mass, toDoubleArray(avXform.get(vals)), cRadius, cHeight);
+		avatar.setPhysicsObject(caps2P);
+		// lock rotation so the panda doesn’t tip over
+		((JBulletPhysicsObject)caps2P).getRigidBody().setAngularFactor(0f);
 
 		// --- now create the static floor plane underneath ---
 		float[] up = {0f, 1f, 0f};
@@ -502,9 +510,9 @@ public class MyGame extends VariableFrameRateGame
 					go.setLocalTranslation(mat2);
 
 					// set rotation
-					mat.getRotation(aa);
-					mat3.rotation(aa);
-					go.setLocalRotation(mat3);
+					//mat.getRotation(aa);
+					//mat3.rotation(aa);
+					//go.setLocalRotation(mat3);
 				} 
 			} 
 		}
@@ -602,6 +610,11 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f cameraOffset = new Vector3f(fwd).mul(-2.5f).add(up.mul(1.3f));
 		Vector3f cameraPosition = new Vector3f(loc).add(cameraOffset);
 		cam.setLocation(cameraPosition);
+
+		Vector3f newAvLoc = avatar.getWorldLocation();
+		Matrix4f updatedXform = new Matrix4f().translation(
+			newAvLoc.x, newAvLoc.y, newAvLoc.z);
+		caps2P.setTransform(toDoubleArray(updatedXform.get(vals)));
 
 		// bat translations
 		Vector3f handOffset = new Vector3f(-0.25f, 0.935f, -0.18f);
