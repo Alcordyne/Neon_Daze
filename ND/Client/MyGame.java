@@ -79,6 +79,12 @@ public class MyGame extends VariableFrameRateGame
 	private float cRadius;
 	private float cHeight;
 
+	//Animation timing
+	private boolean wHeld      = false;
+	private boolean isSwinging = false;
+	private long    swingEnd   = 0L;
+	private static final long SWING_MS = 600; 
+
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
 		gm = new GhostManager(this);
@@ -117,12 +123,17 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void loadShapes()
-	{	avatarS = new AnimatedShape("panda.rkm", "panda.rks");
-		avatarS.loadAnimation("RUN", "panda.rka");
-		npcS = new AnimatedShape("panda.rkm", "panda.rks");
-		npcS.loadAnimation("RUN", "panda.rka");
-		ghostS = new AnimatedShape("panda.rkm", "panda.rks");
-		ghostS.loadAnimation("RUN", "panda.rka");
+	{	avatarS = new AnimatedShape("panda2.rkm", "panda2.rks");
+		avatarS.loadAnimation("RUN", "pandaRun.rka");
+		avatarS.loadAnimation("SWING", "pandaSwing.rka");
+		avatarS.loadAnimation("IDLE", "pandaIdle.rka");
+
+		npcS = new AnimatedShape("panda2.rkm", "panda2.rks");
+		npcS.loadAnimation("RUN", "pandaRun.rka");
+
+		ghostS = new AnimatedShape("panda2.rkm", "panda2.rks");
+		ghostS.loadAnimation("RUN", "pandaRun.rka");
+
 		batS = new ImportedModel("bat.obj");
 		hammerS = new ImportedModel("hammer.obj");
 		terrS = new TerrainPlane(400);
@@ -407,6 +418,13 @@ public class MyGame extends VariableFrameRateGame
 		avatarS.updateAnimation();
 		setEarParameters(); 
 
+		  if (isSwinging && System.currentTimeMillis() >= swingEnd) {
+			isSwinging = false;
+			// if W is still down, go back into RUN
+			if (wHeld) {
+			avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+			}
+  		}
 
 		if (!gameOver) {
 			long currentTime = System.currentTimeMillis();
@@ -619,6 +637,11 @@ public class MyGame extends VariableFrameRateGame
 				swingSound.setLocation( avatar.getWorldLocation() );
 				setEarParameters();
 				swingSound.play();
+
+				avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
+				isSwinging = true;
+      			swingEnd = System.currentTimeMillis() + SWING_MS;
+
 				if (caps1P != null) {
 					// compute knockback direction
 					Vector3f npcPos    = npc.getWorldLocation();
@@ -652,6 +675,7 @@ public class MyGame extends VariableFrameRateGame
 				break;
 
 			case KeyEvent.VK_W:
+			 	wHeld = true;
 				avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
 				break;
 
@@ -663,7 +687,9 @@ public class MyGame extends VariableFrameRateGame
 	public void keyReleased(KeyEvent e) {
 		super.keyReleased(e);
 		if (e.getKeyCode() == KeyEvent.VK_W) {
+			wHeld = false;
 			avatarS.stopAnimation();
+			avatarS.playAnimation("IDLE", 1.0f, AnimatedShape.EndType.LOOP, 0);
 		}
 	}
 
