@@ -31,7 +31,8 @@ public class BckAction extends AbstractInputAction
         bckDirection.mul(speed*time);
         newPosition = oldPosition.add(bckDirection.x(), bckDirection.y(), bckDirection.z());
         dol.setLocalLocation(newPosition);
-        protClient.sendMoveMessage(dol.getWorldLocation());
+        if(protClient != null)
+            protClient.sendMoveMessage(dol.getWorldLocation());
 
     }
 }

@@ -69,7 +69,7 @@ public class MyGame extends VariableFrameRateGame
 
 	private GameObject avatar,npc,terr, bat,hammer, x,y,z;
 	private ObjShape terrS,linxS,linyS,linzS, batS,hammerS;
-	private TextureImage avatartx,npctx, ghostT, hmap, ground, wood,hammerTx;
+	private TextureImage whitePandatx, redPandatx, ghostT, hmap, ground, wood,hammerTx;
 
 	private IAudioManager audioMgr;
 	private Sound swingSound;
@@ -85,6 +85,11 @@ public class MyGame extends VariableFrameRateGame
 	private long    swingEnd   = 0L;
 	private static final long SWING_MS = 600; 
 
+	//Menu
+	private enum GameState { MENU, PLAYING, AVATARSELECT }
+	private GameState gameState    = GameState.MENU;
+	private int       menuSelection = 0;  
+
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
 		gm = new GhostManager(this);
@@ -94,7 +99,8 @@ public class MyGame extends VariableFrameRateGame
 			this.serverProtocol = ProtocolType.UDP;
 	}
 	public static void main(String[] args)
-	{	game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
+	{	
+		game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
 		engine = new Engine(game);
 		game.initializeSystem();
 		game.game_loop();
@@ -145,8 +151,8 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void loadTextures()
 	{
-		avatartx = new TextureImage("pandatx.jpg");
-		npctx = new TextureImage("redPandaTx.png");
+		whitePandatx = new TextureImage("pandatx.jpg");
+		redPandatx = new TextureImage("redPandaTx.png");
 		ghostT = new TextureImage("redPandaTx.png");
 		hmap = new TextureImage("heightmap.jpg");
 		ground = new TextureImage("ground.jpg");
@@ -169,7 +175,7 @@ public class MyGame extends VariableFrameRateGame
 		}
 
 		// build avatar in the center of the window
-		avatar = new GameObject(GameObject.root(), avatarS, avatartx);
+		avatar = new GameObject(GameObject.root(), avatarS, whitePandatx);
 		initialTranslation = (new Matrix4f()).translation(0f,0f,0f);
 		initialScale = (new Matrix4f()).scaling(.6f, .6f, .6f);
 		avatar.setLocalScale(initialScale);
@@ -178,7 +184,7 @@ public class MyGame extends VariableFrameRateGame
 		avatar.setLocalRotation(initialRotation);
 
 		// build npc in the view of the window
-		npc = new GameObject(GameObject.root(), npcS, npctx);
+		npc = new GameObject(GameObject.root(), npcS, redPandatx);
 		initialTranslation = (new Matrix4f()).translation(8f,.5f,9f);
 		initialScale = (new Matrix4f()).scaling(.6f, .6f, .6f);
 		Matrix4f NrotationY = new Matrix4f().rotationY((float) Math.toRadians(210f));
@@ -259,8 +265,6 @@ public class MyGame extends VariableFrameRateGame
 		elapsTime = 0.0;
 		(engine.getRenderSystem()).setWindowDimensions(1900,1000);
 
-		setupNetworking();
-
 		swingSound.setLocation(avatar.getWorldLocation());
 		setEarParameters();
 		swingSound.play();
@@ -314,8 +318,7 @@ public class MyGame extends VariableFrameRateGame
 
 		engine.enablePhysicsWorldRender();
 
-
-        // ----------------- OTHER INPUTS SECTION -----------------------------
+		// ----------------- OTHER INPUTS SECTION -----------------------------
 		FwdAction fwdAction = new FwdAction(this, protClient);
 		BckAction bckAction = new BckAction(this, protClient);
 		TurnAction turnAction = new TurnAction(this, protClient);
@@ -323,11 +326,9 @@ public class MyGame extends VariableFrameRateGame
 			im.associateActionWithAllKeyboards(
 					Key.W, fwdAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-					protClient.sendMoveMessage(avatar.getWorldLocation());
 			im.associateActionWithAllKeyboards(
 					Key.S, bckAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-					protClient.sendMoveMessage(avatar.getWorldLocation());
 			im.associateActionWithAllKeyboards(
 					Key.A, turnAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
@@ -397,11 +398,43 @@ public class MyGame extends VariableFrameRateGame
 						fwdAction.performAction(time, e);
 					}
 				}, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-
 	}
+
 
 	@Override
 	public void update() {
+
+		// MENU STATE: draw two lines of HUD and skip the rest
+		if (gameState == GameState.MENU) {
+			Camera cam = (engine.getRenderSystem().getViewport("LEFT").getCamera());
+			Vector3f camStart = new Vector3f(0,1000f,0);
+			cam.setLocation(camStart);
+			// draw the two options, highlighting the selected one
+			Vector3f black = new Vector3f(0,0,0);
+			Vector3f blue = new Vector3f(0,0,1);
+			if (menuSelection == 0) {
+				engine.getHUDmanager().setHUD1("> Single Player", blue,  100, 300);
+				engine.getHUDmanager().setHUD2("  Multiplayer",  black,  100, 260);
+			} else {
+				engine.getHUDmanager().setHUD1("  Single Player", black,  100, 300);
+				engine.getHUDmanager().setHUD2("> Multiplayer",   blue, 100, 260);
+			}
+			return;
+		}
+		if (gameState == GameState.AVATARSELECT) {
+			// draw the two options, highlighting the selected one
+			Vector3f white = new Vector3f(1,1,1);
+			Vector3f red = new Vector3f(1,0,0);
+			Vector3f black = new Vector3f(0,0,0);
+			if (menuSelection == 0) {
+				engine.getHUDmanager().setHUD1("> White Panda", white,  100, 300);
+				engine.getHUDmanager().setHUD2("  Red Panda",  black,  100, 260);
+			} else {
+				engine.getHUDmanager().setHUD1("  White Panda", black,  100, 300);
+				engine.getHUDmanager().setHUD2("> Red Panda",   red, 100, 260);
+			}
+			return;
+		}
 
 		long startTime = 0,elapsedTime,prevTime = 0,amt = 0;
 		double totalTime = System.currentTimeMillis() - startTime;
@@ -613,72 +646,117 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void keyPressed(KeyEvent e)
 	{
-		Matrix4f initialTranslation, initialScale;
-		switch (e.getKeyCode())
-		{
-			case KeyEvent.VK_SPACE: 
-				for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
-				swingSound.stop();
-				swingSound.setLocation( ghost.getWorldLocation() );
-				setEarParameters();
-				swingSound.play();
-				}
-				break;
-			case KeyEvent.VK_C: // Toggle npc
-				npcR = !npcR;
-				break;
+		if (gameState == GameState.MENU || gameState == GameState.AVATARSELECT) {
+			switch (e.getKeyCode()) {
+				case KeyEvent.VK_UP:
+				case KeyEvent.VK_W:
+					menuSelection = (menuSelection + 1) % 2;
+					break;
+				case KeyEvent.VK_DOWN:
+				case KeyEvent.VK_S:
+					menuSelection = (menuSelection + 1) % 2;
+					break;
+				case KeyEvent.VK_ENTER:
+					Vector3f white = new Vector3f(1,1,1);
+					
+					if (menuSelection == 0) {
+						//single player
+						if (gameState == GameState.MENU){
+							gameState = GameState.AVATARSELECT;
+						}
+						//white panda
+						else{
+							gameState = GameState.PLAYING;
+							engine.getHUDmanager().setHUD1("", white, 1, 1);
+							engine.getHUDmanager().setHUD2("", white, 1, 1);
+							avatar.setTextureImage(whitePandatx);
+						}
+					} 
+					else {
+						//multiplayer
+						if (gameState == GameState.MENU){
+							gameState = GameState.AVATARSELECT;
+							npc.setLocalScale((new Matrix4f()).scaling(0f, 0f, 0f));
+							setupNetworking();
+						}
+						//red panda
+						else{
+							gameState = GameState.PLAYING;
+							engine.getHUDmanager().setHUD1("", white, 1, 1);
+							engine.getHUDmanager().setHUD2("", white, 1, 1);
+							avatar.setTextureImage(redPandatx);
+						}
+					}
+				default:
+			}
+		}
+		else{
+			switch (e.getKeyCode())
+			{
+				case KeyEvent.VK_SPACE: 
+					for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
+					swingSound.stop();
+					swingSound.setLocation( ghost.getWorldLocation() );
+					setEarParameters();
+					swingSound.play();
+					}
+					break;
+				case KeyEvent.VK_C: // Toggle npc
+					npcR = !npcR;
+					break;
 
-			case KeyEvent.VK_P: // Toggle physics
-				running = !running;
-				break;
+				case KeyEvent.VK_P: // Toggle physics
+					running = !running;
+					break;
 
-			case KeyEvent.VK_Q:
-				swingSound.stop();
-				swingSound.setLocation( avatar.getWorldLocation() );
-				setEarParameters();
-				swingSound.play();
+				case KeyEvent.VK_Q:
+					swingSound.stop();
+					swingSound.setLocation( avatar.getWorldLocation() );
+					setEarParameters();
+					swingSound.play();
 
-				avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
-				isSwinging = true;
-      			swingEnd = System.currentTimeMillis() + SWING_MS;
+					avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
+					isSwinging = true;
+					swingEnd = System.currentTimeMillis() + SWING_MS;
 
-				if (caps1P != null) {
-					// compute knockback direction
-					Vector3f npcPos    = npc.getWorldLocation();
-					Vector3f avatarPos = avatar.getWorldLocation();
-					Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
-					float horizontalStrength = 5.0f;
-					float upwardStrength     = 5.0f;   
+					if (caps1P != null) {
+						// compute knockback direction
+						Vector3f npcPos    = npc.getWorldLocation();
+						Vector3f avatarPos = avatar.getWorldLocation();
+						Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
+						float horizontalStrength = 5.0f;
+						float upwardStrength     = 5.0f;   
 
-					// build final velocity
-					float vx = kbDir.x * horizontalStrength;
-					float vz = kbDir.z * horizontalStrength;
-					float vy = upwardStrength;
+						// build final velocity
+						float vx = kbDir.x * horizontalStrength;
+						float vz = kbDir.z * horizontalStrength;
+						float vy = upwardStrength;
 
-					caps1P.setLinearVelocity(new float[]{ vx, vy, vz });
-				}
-				break;
+						caps1P.setLinearVelocity(new float[]{ vx, vy, vz });
+					}
+					break;
 
-			case KeyEvent.VK_Z: // Toggle axis and physics lines
-				axis = !axis;
-				physicsLines = !physicsLines;
-				if (axis) {
-					createAxis(); 
-				} else {
-					hideAxis(); 
-				}
-				if(physicsLines){
-					engine.enablePhysicsWorldRender();
-				} else{
-					engine.disablePhysicsWorldRender();
-				}
-				break;
+				case KeyEvent.VK_Z: // Toggle axis and physics lines
+					axis = !axis;
+					physicsLines = !physicsLines;
+					if (axis) {
+						createAxis(); 
+					} else {
+						hideAxis(); 
+					}
+					if(physicsLines){
+						engine.enablePhysicsWorldRender();
+					} else{
+						engine.disablePhysicsWorldRender();
+					}
+					break;
 
-			case KeyEvent.VK_W:
-			 	wHeld = true;
-				avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
-				break;
+				case KeyEvent.VK_W:
+					wHeld = true;
+					avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+					break;
 
+			}
 		}
 		super.keyPressed(e);
 	}
@@ -699,6 +777,7 @@ public class MyGame extends VariableFrameRateGame
 	public AnimatedShape getGhostShape() { return ghostS; }
 	public TextureImage getGhostTexture() { return ghostT; }
 	public GhostManager getGhostManager() { return gm; }
+	public ProtocolClient getProtClient() { return protClient;}
 	public static Engine getEngine() { return engine; }
 	
 	private void setupNetworking()
