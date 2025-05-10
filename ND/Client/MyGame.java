@@ -90,6 +90,12 @@ public class MyGame extends VariableFrameRateGame
 	private GameState gameState    = GameState.MENU;
 	private int       menuSelection = 0;  
 
+	//batswing
+	private long    batSwingStart   = 0L;
+	private Matrix4f batRestRotation;
+	private final float swingAmplitude = (float)Math.toRadians(180f);  // 45° arc
+	private Vector3f batRestOffset;
+
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
 		gm = new GhostManager(this);
@@ -211,10 +217,15 @@ public class MyGame extends VariableFrameRateGame
 
 		//build bat
 		bat = new GameObject(avatar, batS, wood);
-		initialTranslation = (new Matrix4f()).translation(-.25f,0.32f,.2f);
-		bat.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(.05f, .05f, .05f);
 		bat.setLocalScale(initialScale);
+		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(-90.0f));
+		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));
+		Matrix4f rotationZ = new Matrix4f().rotationZ((float) Math.toRadians(180.0f));
+		initialRotation = new Matrix4f().mul(rotationY).mul(rotationX).mul(rotationZ);
+		bat.setLocalRotation(initialRotation);
+		batRestRotation = new Matrix4f(bat.getLocalRotation());
+		batRestOffset = new Vector3f(-0.25f, 0.935f, -0.18f);
 
 		//build hammer
 		hammer = new GameObject(npc, hammerS, hammerTx);
@@ -222,12 +233,7 @@ public class MyGame extends VariableFrameRateGame
 		hammer.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(.1f, .1f, .1f);
 		hammer.setLocalScale(initialScale);
-
-		Matrix4f rotationY = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));
-		Matrix4f rotationX = new Matrix4f().rotationX((float) Math.toRadians(-90.0f));
-
-		initialRotation = new Matrix4f().mul(rotationY).mul(rotationX);
-		bat.setLocalRotation(initialRotation);
+		hammer.setLocalRotation(initialRotation);
 
 	}
 
@@ -281,6 +287,11 @@ public class MyGame extends VariableFrameRateGame
 		(engine.getSceneGraph()).addNodeController(ocs);
 		ocs.toggle();
 
+		//BatController batc = new BatController(bat);
+		//(engine.getSceneGraph()).addNodeController(batc);
+		//batc.addTarget(bat);
+		//batc.enable();
+		
 
 		// ----------------- initialize camera ----------------
 		im = engine.getInputManager();
@@ -456,16 +467,33 @@ public class MyGame extends VariableFrameRateGame
 		ghostS.updateAnimation();
 		setEarParameters(); 
 
-		  if (isSwinging && System.currentTimeMillis() >= swingEnd) {
-			isSwinging = false;
-			// if W is still down, go back into RUN
-			if (wHeld) {
-			avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
-			if(protClient != null)
-				protClient.sendAnimationMessage("RUN");
-			}
-  		}
+		long now = System.currentTimeMillis();
+		if (isSwinging) {
+			// 1) compute normalized t in [0,1]
+			float t = (now - batSwingStart) / (float)SWING_MS;
+			if (t > 1f) t = 1f;
 
+			// 2) sine easing: 0→1→0 over π
+			float angle = swingAmplitude * (float)Math.sin((float)Math.PI * t);
+
+			// 3) apply downward rotation about X relative to rest
+			Matrix4f swingRot = new Matrix4f(batRestRotation)
+									.rotateY(-angle);
+			bat.setLocalRotation(swingRot);
+
+			// 4) once both animation & bat have reached end, reset
+			if (now >= swingEnd) {
+				isSwinging = false;
+				bat.setLocalRotation(batRestRotation);
+
+				// panda back to RUN if W still down
+				if (wHeld) {
+					avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+					if (protClient != null)
+						protClient.sendAnimationMessage("RUN");
+				}
+			}
+		}
 		if (!gameOver) {
 			long currentTime = System.currentTimeMillis();
 			double deltaTime = (currentTime - lastFrameTime) / 1000.0; // seconds
@@ -597,13 +625,12 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f cameraPosition = new Vector3f(loc).add(cameraOffset);
 		cam.setLocation(cameraPosition);
 
-		// Update the bat's position and orientation relative to the avatar
-		Matrix4f handOffset = new Matrix4f().translation(-0.25f, 0.32f, .2f);  // Adjust to avatar's hand position
-		Matrix4f relativeRotation = new Matrix4f().rotationY((float) Math.toRadians(-90.0f));  // Initial bat orientation
-
-		// Combine the transformations: avatar rotation -> hand offset -> bat rotation
-		Matrix4f finalTransform = new Matrix4f().mul(avatar.getLocalRotation()).mul(handOffset).mul(relativeRotation);
-		bat.setLocalTranslation(finalTransform);
+		// bat translations
+		Vector3f handOffset = new Vector3f(-0.25f, 0.935f, -0.18f);
+		Matrix4f avatarRot = avatar.getLocalRotation();
+		avatarRot.transformDirection(handOffset);
+		Matrix4f t = new Matrix4f().translation(handOffset);
+		bat.setLocalTranslation(t);
 	}
 	// overhead camera for viewport 2
 	public void CameraOverhead(){
@@ -728,7 +755,8 @@ public class MyGame extends VariableFrameRateGame
 					if(protClient != null)
 						protClient.sendAnimationMessage("SWING");
 					isSwinging = true;
-					swingEnd = System.currentTimeMillis() + SWING_MS;
+					batSwingStart  = System.currentTimeMillis();
+					swingEnd       = batSwingStart + SWING_MS;
 
 					if (caps1P != null) {
 						// compute knockback direction
