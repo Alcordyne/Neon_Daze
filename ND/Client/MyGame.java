@@ -303,17 +303,19 @@ public class MyGame extends VariableFrameRateGame
 		physicsEngine.setGravity(new float[]{0f, -10f, 0f});
 
 		float mass    = 0.5f;
-		cRadius       = 0.5f;
-		cHeight       = 1.0f;
-
-		float yOffset = .5f;
+		cRadius       = 0.25f;
+		cHeight       = 0.0001f;
 
 		Vector3f npcPos = npc.getWorldLocation();
 
-		Matrix4f capsuleXform = new Matrix4f().translation(npcPos.x, npcPos.y + yOffset, npcPos.z);
+		float capsuleYOffset = -(cHeight / 2f - cRadius);
+		Matrix4f capsuleXform = new Matrix4f().translation(npcPos.x, npcPos.y + capsuleYOffset, npcPos.z);
+
+
 
 		double[] tempTransform = toDoubleArray(capsuleXform.get(vals));
 		caps1P = engine.getSceneGraph().addPhysicsCapsule(mass, tempTransform, cRadius, cHeight);
+
 
 		//lock rotation
 		npc.setPhysicsObject(caps1P);
@@ -322,12 +324,18 @@ public class MyGame extends VariableFrameRateGame
 
 		// --- now create the static floor plane underneath ---
 		float[] up = {0f, 1f, 0f};
-		Matrix4f planeXform = new Matrix4f().translation(0f, 0f, 0f);
-		double[] planeTrans = toDoubleArray(planeXform.get(vals));
-		planeP = engine.getSceneGraph()
-				.addPhysicsStaticPlane(planeTrans, up, 0f);
-		planeP.setBounciness(1f);
-		terr.setPhysicsObject(planeP);
+		Matrix4f boxXform = new Matrix4f().translation(0f, 0f, 0f);
+		double[] boxTrans = toDoubleArray(boxXform.get(vals));
+		float[] boxSize = {30f, 1f, 30f};
+
+		PhysicsObject boxP = engine.getSceneGraph()
+				.addPhysicsBox(0f, boxTrans, boxSize); // 0f for no mass, assuming this is a static object
+
+
+		boxP.setBounciness(0f); // Set this to 0 for no bounciness or adjust as needed
+
+
+		terr.setPhysicsObject(boxP);
 
 		engine.enablePhysicsWorldRender();
 	}
