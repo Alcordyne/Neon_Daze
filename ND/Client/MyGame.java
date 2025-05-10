@@ -61,6 +61,8 @@ public class MyGame extends VariableFrameRateGame
 	public boolean axis, physicsLines;
 	private boolean gameOver,npcR = false;
 	private double lastFrameTime, currFrameTime, elapsTime;
+	private long gameStartTime;
+
 
 	private int horizons;
 	private float panX, panY = 0.0f;
@@ -91,7 +93,7 @@ public class MyGame extends VariableFrameRateGame
 	private int       menuSelection = 0;  
 
 	//batswing
-	private long    batSwingStart   = 0L;
+	private long batSwingStart   = 0L;
 	private Matrix4f batRestRotation;
 	private final float swingAmplitude = (float)Math.toRadians(180f);  // 45° arc
 	private Vector3f batRestOffset;
@@ -268,7 +270,9 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void initializeGame()
-	{	lastFrameTime = System.currentTimeMillis();
+	{	
+		gameStartTime = System.currentTimeMillis();
+		lastFrameTime = System.currentTimeMillis();
 		currFrameTime = System.currentTimeMillis();
 		elapsTime = 0.0;
 		(engine.getRenderSystem()).setWindowDimensions(1900,1000);
@@ -433,18 +437,24 @@ public class MyGame extends VariableFrameRateGame
 		elapsedTime = System.currentTimeMillis() - prevTime;
 		prevTime = System.currentTimeMillis();
 
+		//better time
+		long now = System.currentTimeMillis();
+		long elapsedMs = now - gameStartTime;
 
+		// convert to seconds/minutes
+		long totalSeconds = elapsedMs / 1000;
+		long minutes = totalSeconds / 60;
+		long seconds = totalSeconds % 60;
 
-		// HUD 1
-		String dispStr1 = counterStr;
-		Vector3f hud1Color = new Vector3f(1, 0, 0);
-		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 15, 15);
+		// format as MM:SS
+		String dispStr1 = String.format("%02d:%02d", minutes, seconds);
+		Vector3f hud1Color = new Vector3f(0, 0, 1);
+		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 25, 25);
 
 		avatarS.updateAnimation();
 		ghostS.updateAnimation();
 		setEarParameters(); 
 
-		long now = System.currentTimeMillis();
 		if (isSwinging) {
 			// 1) compute normalized t in [0,1]
 			float t = (now - batSwingStart) / (float)SWING_MS;
