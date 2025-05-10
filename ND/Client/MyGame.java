@@ -115,22 +115,16 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void createViewports()
 	{   (engine.getRenderSystem()).addViewport("LEFT",0,0,1f,1f);
-		(engine.getRenderSystem()).addViewport("RIGHT",.75f,0,.25f,.25f);
+
 		Viewport leftVp = (engine.getRenderSystem()).getViewport("LEFT");
-		Viewport rightVp = (engine.getRenderSystem()).getViewport("RIGHT");
+
 		Camera leftCamera = leftVp.getCamera();
-		Camera rightCamera = rightVp.getCamera();
-		rightVp.setHasBorder(true);
-		rightVp.setBorderWidth(4);
-		rightVp.setBorderColor(0.0f, 1.0f, 0.0f);
+
 		leftCamera.setLocation(new Vector3f(-2,0,2));
 		leftCamera.setU(new Vector3f(1,0,0));
 		leftCamera.setV(new Vector3f(0,1,0));
 		leftCamera.setN(new Vector3f(0,0,-1));
-		rightCamera.setLocation(new Vector3f(0,2,0));
-		rightCamera.setU(new Vector3f(1,0,0));
-		rightCamera.setV(new Vector3f(0,0,-1));
-		rightCamera.setN(new Vector3f(0,-1,0));
+
 	}
 
 	@Override
@@ -250,14 +244,20 @@ public class MyGame extends VariableFrameRateGame
 	@Override
 	public void loadSounds()
 	{ 
-		AudioResource resource1;
+		AudioResource swingsfx,bgm;
 		audioMgr = engine.getAudioManager();
-		resource1 = audioMgr.createAudioResource("swing_mono.wav", AudioResourceType.AUDIO_SAMPLE);
-		swingSound = new Sound(resource1, SoundType.SOUND_EFFECT, 100, false);
+
+		swingsfx = audioMgr.createAudioResource("swing_mono.wav", AudioResourceType.AUDIO_SAMPLE);
+		swingSound = new Sound(swingsfx, SoundType.SOUND_EFFECT, 100, false);
 		swingSound.initialize(audioMgr);
 		swingSound.setMaxDistance(10.0f);
 		swingSound.setMinDistance(0.5f);
 		swingSound.setRollOff(5.0f);
+
+		bgm = audioMgr.createAudioResource("bgm.wav", AudioResourceType.AUDIO_STREAM);
+		Sound backgroundMusic = new Sound(bgm, SoundType.SOUND_MUSIC, 2, true); // `true` for looping
+		backgroundMusic.initialize(audioMgr);
+		backgroundMusic.play();
 	}
 	@Override
 	public void loadSkyBoxes()
@@ -351,37 +351,6 @@ public class MyGame extends VariableFrameRateGame
 					Key.D, turnAction,
 					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 
-		// Zooming in and out HUD 2
-		im.associateActionWithAllKeyboards(
-				Key.UP, (time, e) -> {
-					zoom -= 0.1f; // Zoom in
-					if (zoom < 0.25f) zoom = 0.25f; // Minimum zoom level
-				},
-				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN
-		);
-
-		im.associateActionWithAllKeyboards(
-				Key.DOWN, (time, e) -> {
-					zoom += 0.1f; // Zoom out
-					if (zoom > 2.0f) zoom = 2.0f; // Maximum zoom level
-				},
-				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN
-		);
-
-		// Panning left and right HUD 2
-		im.associateActionWithAllKeyboards(
-				Key.LEFT, (time, e) -> {
-					panX -= 0.1f; // Pan left
-				},
-				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN
-		);
-
-		im.associateActionWithAllKeyboards(
-				Key.RIGHT, (time, e) -> {
-					panX += 0.1f; // Pan right
-				},
-				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN
-		);
 
 		im.associateActionWithAllGamepads(
 				Axis.X, (time, e) -> {
@@ -501,7 +470,6 @@ public class MyGame extends VariableFrameRateGame
 			
 			im.update((float)deltaTime);
 			avatarMove();
-			CameraOverhead();
 			processNetworking((float)deltaTime);
 		}
 
@@ -632,17 +600,7 @@ public class MyGame extends VariableFrameRateGame
 		Matrix4f t = new Matrix4f().translation(handOffset);
 		bat.setLocalTranslation(t);
 	}
-	// overhead camera for viewport 2
-	public void CameraOverhead(){
-		Camera rightCamera = engine.getRenderSystem().getViewport("RIGHT").getCamera();
-		Vector3f avatarPos = avatar.getWorldLocation();
 
-		Vector3f cameraOffset = new Vector3f(panX, 10 * zoom, panY);
-		Vector3f cameraPosition = new Vector3f(avatarPos).add(cameraOffset);
-		rightCamera.setLocation(cameraPosition);
-		// Make the camera look at the avatar
-		rightCamera.lookAt(new Vector3f(avatarPos.x + panX, 0, avatarPos.z + panY));
-	}
 
 	public void setEarParameters()
 	{ 
