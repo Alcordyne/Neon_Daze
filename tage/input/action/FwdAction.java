@@ -32,5 +32,6 @@ public class FwdAction extends AbstractInputAction
             newPosition = oldPosition.add(fwdDirection.x(),
             fwdDirection.y(), fwdDirection.z());
             dol.setLocalLocation(newPosition);
-            protClient.sendMoveMessage(dol.getWorldLocation());
+            if(protClient != null)
+                protClient.sendMoveMessage(dol.getWorldLocation());
     } }

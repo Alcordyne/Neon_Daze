@@ -25,11 +25,13 @@ public class TurnAction extends AbstractInputAction {
         if (key.equals("A")) {
             // Turn left
             game.getAvatar().globalYaw(turnAmount*time);
-            protClient.sendTurnMessage(turnAmount*time);
+            if(protClient != null)
+                protClient.sendTurnMessage(turnAmount*time);
         } else if (key.equals("D")) {
             // Turn right
             game.getAvatar().globalYaw(-turnAmount*time);
-            protClient.sendTurnMessage(-turnAmount*time);
+            if(protClient != null)
+                protClient.sendTurnMessage(-turnAmount*time);
         }
     }
 }
