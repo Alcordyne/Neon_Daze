@@ -10,6 +10,7 @@ import org.joml.*;
 
 import tage.*;
 import tage.networking.client.GameConnectionClient;
+import tage.shapes.AnimatedShape;
 
 public class ProtocolClient extends GameConnectionClient
 {
@@ -118,6 +119,18 @@ public class ProtocolClient extends GameConnectionClient
 				// Update the ghost avatar's rotation
 				ghostManager.updateGhostAvatarRotation(ghostID, yaw);
 			}	
+			// Format: (anim,remoteId,animType)
+			if (messageTokens[0].compareTo("anim") == 0) {
+				UUID ghostID = UUID.fromString(messageTokens[1]);
+				String animType = messageTokens[2];
+
+				GhostAvatar ghostAvatar = ghostManager.getGhostAvatar(ghostID);
+				if (ghostAvatar != null) {
+					AnimatedShape ghostShape = (AnimatedShape) ghostAvatar.getShape();
+					ghostShape.playAnimation(animType, 1.0f,animType.equals("SWING") ? AnimatedShape.EndType.STOP : AnimatedShape.EndType.LOOP, 0);
+				}	
+			}
+
 		}	
 	}
 	
@@ -205,6 +218,14 @@ public class ProtocolClient extends GameConnectionClient
 		} 
 		catch (IOException e) 
 		{
+			e.printStackTrace();
+		}
+	}
+	public void sendAnimationMessage(String animType) {
+		try {
+			String message = new String("anim," + id.toString() + "," + animType);
+			sendPacket(message);
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

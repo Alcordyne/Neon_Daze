@@ -24,7 +24,9 @@ public class GhostManager
 	public void createGhostAvatar(UUID id, Vector3f position) throws IOException
 	{	System.out.println("adding ghost with ID --> " + id);
  		AnimatedShape s = game.getGhostShape();
-    	s.loadAnimation("RUN","panda.rka");
+    	s.loadAnimation("RUN","PandaRun.rka");
+		s.loadAnimation("SWING", "pandaSwing.rka");
+		s.loadAnimation("IDLE", "pandaIdle.rka");
 		TextureImage t = game.getGhostTexture();
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
 		Matrix4f initialScale = (new Matrix4f()).scaling(.6f);
@@ -58,7 +60,8 @@ public class GhostManager
 	public void updateGhostAvatar(UUID id, Vector3f position)
 	{	GhostAvatar ghostAvatar = findAvatar(id);
 		if (ghostAvatar != null)
-		{	ghostAvatar.setPosition(position);
+		{	
+			ghostAvatar.setPosition(position);
 		}
 		else
 		{	System.out.println("tried to update ghost avatar position, but unable to find ghost in list");
