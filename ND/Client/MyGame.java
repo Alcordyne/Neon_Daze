@@ -139,6 +139,8 @@ public class MyGame extends VariableFrameRateGame
 
 		ghostS = new AnimatedShape("panda2.rkm", "panda2.rks");
 		ghostS.loadAnimation("RUN", "pandaRun.rka");
+		ghostS.loadAnimation("SWING", "pandaSwing.rka");
+		ghostS.loadAnimation("IDLE", "pandaIdle.rka");
 
 		batS = new ImportedModel("bat.obj");
 		hammerS = new ImportedModel("hammer.obj");
@@ -317,7 +319,9 @@ public class MyGame extends VariableFrameRateGame
 		terr.setPhysicsObject(planeP);
 
 		engine.enablePhysicsWorldRender();
+	}
 
+	private void setupInputs(){
 		// ----------------- OTHER INPUTS SECTION -----------------------------
 		FwdAction fwdAction = new FwdAction(this, protClient);
 		BckAction bckAction = new BckAction(this, protClient);
@@ -449,6 +453,7 @@ public class MyGame extends VariableFrameRateGame
 		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 15, 15);
 
 		avatarS.updateAnimation();
+		ghostS.updateAnimation();
 		setEarParameters(); 
 
 		  if (isSwinging && System.currentTimeMillis() >= swingEnd) {
@@ -456,6 +461,8 @@ public class MyGame extends VariableFrameRateGame
 			// if W is still down, go back into RUN
 			if (wHeld) {
 			avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+			if(protClient != null)
+				protClient.sendAnimationMessage("RUN");
 			}
   		}
 
@@ -663,6 +670,7 @@ public class MyGame extends VariableFrameRateGame
 						//single player
 						if (gameState == GameState.MENU){
 							gameState = GameState.AVATARSELECT;
+							setupInputs();
 						}
 						//white panda
 						else{
@@ -678,6 +686,7 @@ public class MyGame extends VariableFrameRateGame
 							gameState = GameState.AVATARSELECT;
 							npc.setLocalScale((new Matrix4f()).scaling(0f, 0f, 0f));
 							setupNetworking();
+							setupInputs();
 						}
 						//red panda
 						else{
@@ -716,6 +725,8 @@ public class MyGame extends VariableFrameRateGame
 					swingSound.play();
 
 					avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
+					if(protClient != null)
+						protClient.sendAnimationMessage("SWING");
 					isSwinging = true;
 					swingEnd = System.currentTimeMillis() + SWING_MS;
 
@@ -754,6 +765,8 @@ public class MyGame extends VariableFrameRateGame
 				case KeyEvent.VK_W:
 					wHeld = true;
 					avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+					if(protClient != null)
+						protClient.sendAnimationMessage("RUN");
 					break;
 
 			}
@@ -768,6 +781,8 @@ public class MyGame extends VariableFrameRateGame
 			wHeld = false;
 			avatarS.stopAnimation();
 			avatarS.playAnimation("IDLE", 1.0f, AnimatedShape.EndType.LOOP, 0);
+			if(protClient != null)
+				protClient.sendAnimationMessage("IDLE");
 		}
 	}
 

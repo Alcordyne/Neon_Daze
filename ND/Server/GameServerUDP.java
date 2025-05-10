@@ -2,7 +2,6 @@ package ND.Server;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.UUID;
-
 import tage.networking.server.GameConnectionServer;
 import tage.networking.server.IClientInfo;
 
@@ -75,6 +74,12 @@ public class GameServerUDP extends GameConnectionServer<UUID>
 				UUID clientID = UUID.fromString(messageTokens[1]);
 				String yaw = messageTokens[2];
 				sendTurnMessages(clientID, yaw);
+			}
+			// Received Message Format: (anim,localId,animType)
+			if (messageTokens[0].compareTo("anim") == 0) {
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				String animType = messageTokens[2];
+				sendAnimationMessages(clientID, animType);
 			}
 }	}
 
@@ -190,6 +195,15 @@ public class GameServerUDP extends GameConnectionServer<UUID>
 		} 
 		catch (IOException e) 
 		{
+			e.printStackTrace();
+		}
+	}
+
+	public void sendAnimationMessages(UUID clientID, String animType) {
+		try {
+			String message = new String("anim," + clientID.toString() + "," + animType);
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
