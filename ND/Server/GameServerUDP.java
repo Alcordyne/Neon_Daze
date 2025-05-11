@@ -81,6 +81,13 @@ public class GameServerUDP extends GameConnectionServer<UUID>
 				String animType = messageTokens[2];
 				sendAnimationMessages(clientID, animType);
 			}
+			if (messageTokens[0].compareTo("knock") == 0) {
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				float vx      = Float.parseFloat(messageTokens[2]);
+				float vy      = Float.parseFloat(messageTokens[3]);
+				float vz      = Float.parseFloat(messageTokens[4]);
+				sendKnockMessages(clientID, vx, vy, vz);
+			}
 }	}
 
 	// Informs the client who just requested to join the server if their if their 
@@ -202,6 +209,14 @@ public class GameServerUDP extends GameConnectionServer<UUID>
 	public void sendAnimationMessages(UUID clientID, String animType) {
 		try {
 			String message = new String("anim," + clientID.toString() + "," + animType);
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	private void sendKnockMessages(UUID clientID, float vx, float vy, float vz) {
+		try {
+			String message = new String("knock," + clientID.toString() + ","+ vx + "," + vy + "," + vz);
 			forwardPacketToAll(message, clientID);
 		} catch (IOException e) {
 			e.printStackTrace();
