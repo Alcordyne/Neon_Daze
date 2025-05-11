@@ -72,6 +72,17 @@ public class MyGame extends VariableFrameRateGame
 
 	private static final float attackRange = 2.0f;
 
+	// AI variables
+	private static final float AI_ATTACK_RANGE = 2.5f;
+	private static final float AI_DASH_RANGE = 5.0f;
+	private static final long AI_DASH_COOLDOWN = 5000; // 5 seconds
+	private static final float AI_MOVE_SPEED = 0.03f;
+	private long lastAIActionTime = 0;
+	private long lastAIDashTime = 0;
+	private boolean aiIsSwinging = false;
+	private long aiSwingEndTime = 0;
+	private boolean aiIsDashing = false;
+	private long aiDashEndTime = 0;
 
 	private int horizons;
 	private float panX, panY = 0.0f;
@@ -426,6 +437,147 @@ public class MyGame extends VariableFrameRateGame
 		}
 	}
 
+	private void updateAIBehavior(float elapsedTime) {
+		if (gameState != GameState.PLAYING || !npcR) return;
+
+		long currentTime = System.currentTimeMillis();
+		Vector3f npcPos = npc.getWorldLocation();
+		Vector3f avatarPos = avatar.getWorldLocation();
+		float distance = npcPos.distance(avatarPos);
+
+		// Handle current actions first
+		if (aiIsSwinging) {
+			if (currentTime >= aiSwingEndTime) {
+				aiIsSwinging = false;
+				npcS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+			} else {
+				// Continue swinging animation
+				return;
+			}
+		}
+
+		if (aiIsDashing) {
+			if (currentTime >= aiDashEndTime) {
+				aiIsDashing = false;
+			} else {
+				// Apply dash movement
+				Vector3f dashDirection = npc.getWorldForwardVector();
+				Vector3f newPos = new Vector3f(
+						npcPos.x + dashDirection.x * DASH_SPEED * 1.5f,
+						npcPos.y,
+						npcPos.z + dashDirection.z * DASH_SPEED * 1.5f
+				);
+				npc.setLocalLocation(newPos);
+				return;
+			}
+		}
+
+		// Behavior tree decision making
+		if (distance <= AI_ATTACK_RANGE) {
+			// Attack if in range
+			performAISwing();
+		}
+		else if (distance <= AI_DASH_RANGE && (currentTime - lastAIDashTime) > AI_DASH_COOLDOWN) {
+			// Dash if in dash range and cooldown is over
+			performAIDash();
+		}
+		else {
+			// Move toward player
+			moveTowardPlayer();
+		}
+
+		// Update NPC rotation to face player
+		npc.lookAt(avatar);
+	}
+
+	private void moveTowardPlayer() {
+		Vector3f npcPos = npc.getWorldLocation();
+		Vector3f avatarPos = avatar.getWorldLocation();
+
+		// Only move if not too close (to prevent jitter)
+		if (npcPos.distance(avatarPos) > 1.5f) {
+			Vector3f direction = new Vector3f(avatarPos).sub(npcPos).normalize();
+			direction.mul(AI_MOVE_SPEED);
+			Vector3f newPos = new Vector3f(npcPos).add(direction);
+
+			// Adjust height based on terrain
+			float height = terr.getHeight(newPos.x, newPos.z);
+			newPos.y = height;
+
+			npc.setLocalLocation(newPos);
+			npcS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
+		} else {
+			npcS.playAnimation("IDLE", 1.0f, AnimatedShape.EndType.LOOP, 0);
+		}
+
+		// Update physics object
+		if (caps1P != null) {
+			Matrix4f updatedXform = new Matrix4f().translation(
+					npcPos.x, npcPos.y, npcPos.z);
+			caps1P.setTransform(toDoubleArray(updatedXform.get(vals)));
+		}
+	}
+
+	private void performAISwing() {
+		long currentTime = System.currentTimeMillis();
+
+		// Play swing animation
+		npcS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
+		aiIsSwinging = true;
+		aiSwingEndTime = currentTime + SWING_MS;
+
+		// Play swing sound
+		swingSound.stop();
+		swingSound.setLocation(npc.getWorldLocation());
+		setEarParameters();
+		swingSound.play();
+
+		// Check hit detection
+		Vector3f npcPos = npc.getWorldLocation();
+		Vector3f avatarPos = avatar.getWorldLocation();
+		float distance = npcPos.distance(avatarPos);
+
+		if (distance <= AI_ATTACK_RANGE) {
+			triggerOrangeFlash(npcPos);
+
+			// Apply knockback to player
+			if (caps2P != null) {
+				Vector3f kbDir = new Vector3f(avatarPos).sub(npcPos).normalize();
+				float[] knockForce = {
+						kbDir.x * 8.0f, // horizontal strength
+						5.0f,           // upward strength
+						kbDir.z * 8.0f  // horizontal strength
+				};
+				caps2P.setLinearVelocity(knockForce);
+			}
+		}
+	}
+
+	private void performAIDash() {
+		long currentTime = System.currentTimeMillis();
+		aiIsDashing = true;
+		aiDashEndTime = currentTime + DASH_DURATION;
+		lastAIDashTime = currentTime;
+
+		// Play dash sound
+		swingSound.stop();
+		swingSound.setLocation(npc.getWorldLocation());
+		setEarParameters();
+		swingSound.play();
+
+		// Apply initial dash impulse if using physics
+		if (caps1P != null) {
+			Vector3f dashDirection = npc.getWorldForwardVector();
+			float dashPower = 12f;
+			float[] impulse = {
+					dashDirection.x * dashPower,
+					0,
+					dashDirection.z * dashPower
+			};
+			caps1P.setLinearVelocity(impulse);
+		}
+	}
+
 	@Override
 	public void initializeGame()
 	{
@@ -726,25 +878,7 @@ public class MyGame extends VariableFrameRateGame
 		}
 
 		if (npcR) {
-			Vector3f npcPos = npc.getWorldLocation();
-			Vector3f avatarPos = avatar.getWorldLocation();
-			float distance = npcPos.distance(avatarPos);
-			npcS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
-			if (distance > 0.15f && distance <= 15.0f) {
-				Vector3f direction = new Vector3f(avatarPos).sub(npcPos).normalize();
-				float speed = 0.02f;
-				direction.mul(speed);
-				Vector3f newPos = new Vector3f(npcPos).add(direction);
-				npc.setLocalLocation(newPos);
-				npc.lookAt(avatar);
-
-				//move capsule
-				//Vector3f worldPos = npc.getWorldLocation();
-				//float yOffset = (cHeight / 2f) + cRadius;
-				//Matrix4f physicsMat = new Matrix4f().translation(worldPos.x, worldPos.y + yOffset, worldPos.z);
-				//physicsMat.get(vals);
-				//caps1P.setTransform(toDoubleArray(vals));
-			}
+			updateAIBehavior((float)elapsedTime);
 		}
 	}
 
@@ -998,6 +1132,10 @@ public class MyGame extends VariableFrameRateGame
 					break;
 				case KeyEvent.VK_C: // Toggle npc
 					npcR = !npcR;
+					if (!npcR) {
+						// When turning off, reset to idle animation
+						npcS.playAnimation("IDLE", 1.0f, AnimatedShape.EndType.LOOP, 0);
+					}
 					break;
 
 				case KeyEvent.VK_P: // Toggle physics

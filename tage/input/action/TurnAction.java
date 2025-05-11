@@ -12,7 +12,7 @@ public class TurnAction extends AbstractInputAction {
     private MyGame game;
     private ProtocolClient protClient;
     private float turnAmount = 4.0f;
-    private float gamepadTurnMultiplier = .5f;
+    private float gamepadTurnMultiplier = 1f;
 
     public TurnAction(MyGame game, ProtocolClient protClient) {
         this.game = game;
@@ -59,12 +59,5 @@ public class TurnAction extends AbstractInputAction {
                 }
             }
         }
-    }
-    public void setTurnAmount(float amount) {
-        turnAmount = amount;
-    }
-
-    public void setGamepadMultiplier(float multiplier) {
-        gamepadTurnMultiplier = multiplier;
     }
 }
