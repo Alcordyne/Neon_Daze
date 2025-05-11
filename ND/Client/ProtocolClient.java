@@ -129,7 +129,13 @@ public class ProtocolClient extends GameConnectionClient
 					AnimatedShape ghostShape = (AnimatedShape) ghostAvatar.getShape();
 					ghostShape.playAnimation(animType, 1.0f,animType.equals("SWING") ? AnimatedShape.EndType.STOP : AnimatedShape.EndType.LOOP, 0);
 				}	
-			}
+				if ("SWING".equals(animType)) {
+					game.swingSound.stop();
+					game.swingSound.setLocation(ghostAvatar.getWorldLocation());
+					game.setEarParameters();
+					game.swingSound.play();
+				}
+				}
 			if (messageTokens[0].equals("knock")) {
 				UUID ghostID = UUID.fromString(messageTokens[1]);
 					float vx = Float.parseFloat(messageTokens[2]);
@@ -137,10 +143,7 @@ public class ProtocolClient extends GameConnectionClient
 					float vz = Float.parseFloat(messageTokens[4]);
 					// apply to our avatar’s physics object:
 					game.caps2P.setLinearVelocity(new float[]{ vx, vy, vz });
-					
-
 			}
-
 		}	
 	}
 	
