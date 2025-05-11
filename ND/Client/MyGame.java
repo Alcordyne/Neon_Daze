@@ -95,7 +95,11 @@ public class MyGame extends VariableFrameRateGame
 	private boolean wHeld      = false;
 	private boolean isSwinging = false;
 	private long    swingEnd   = 0L;
-	private static final long SWING_MS = 600; 
+	private static final long SWING_MS = 600;
+
+	private boolean isSwingOnCooldown = false;
+	private long lastSwingTime = 0;
+	private static final long SWING_COOLDOWN_MS = 750;
 
 	//Menu
 	private enum GameState { MENU, PLAYING, AVATARSELECT }
@@ -107,6 +111,14 @@ public class MyGame extends VariableFrameRateGame
 	private Matrix4f batRestRotation;
 	private final float swingAmplitude = (float)Math.toRadians(180f);  // 45° arc
 	private Vector3f batRestOffset;
+
+	//dash
+	private boolean isDashing = false;
+	private long dashStartTime = 0;
+	private long dashCooldownEnd = 0;
+	private static final long DASH_DURATION = 300;
+	private static final long DASH_COOLDOWN = 3000; // 3 seconds
+	private static final float DASH_SPEED = 0.3f;
 
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
@@ -328,6 +340,74 @@ public class MyGame extends VariableFrameRateGame
 		(engine.getSceneGraph()).setSkyBoxEnabled(true);
 	}
 
+	private void handleDash(float elapsedTime) {
+		if (isDashing) {
+			long currentTime = System.currentTimeMillis();
+			if (currentTime - dashStartTime < DASH_DURATION) {
+				// Apply dash movement
+				Vector3f dashDirection = avatar.getWorldForwardVector();
+				Vector3f currentPos = avatar.getWorldLocation();
+				Vector3f newPos = new Vector3f(
+						currentPos.x + dashDirection.x * DASH_SPEED,
+						currentPos.y,
+						currentPos.z + dashDirection.z * DASH_SPEED
+				);
+				avatar.setLocalLocation(newPos);
+			} else {
+				isDashing = false;
+			}
+		}
+	}
+
+	private void handleSwing() {
+		long currentTime = System.currentTimeMillis();
+
+		// Check cooldown
+		if (isSwingOnCooldown) {
+			if (currentTime - lastSwingTime >= SWING_COOLDOWN_MS) {
+				isSwingOnCooldown = false;
+			} else {
+				return; // Still on cooldown
+			}
+		}
+
+		// Execute swing
+		swingSound.stop();
+		swingSound.setLocation(avatar.getWorldLocation());
+		setEarParameters();
+		swingSound.play();
+
+		avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
+		if (protClient != null) {
+			protClient.sendAnimationMessage("SWING");
+		}
+
+		isSwinging = true;
+		batSwingStart = currentTime;
+		swingEnd = currentTime + SWING_MS;
+		lastSwingTime = currentTime;
+		isSwingOnCooldown = true;
+
+		// Hit detection
+		if (caps1P != null) {
+			Vector3f npcPos = npc.getWorldLocation();
+			Vector3f avatarPos = avatar.getWorldLocation();
+			float distance = npcPos.distance(avatarPos);
+
+			if (distance <= attackRange) {
+				triggerOrangeFlash(avatar.getWorldLocation());
+				// Apply knockback
+				Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
+				float[] knockForce = {
+						kbDir.x * 8.0f, // horizontal strength
+						5.0f,           // upward strength
+						kbDir.z * 8.0f  // horizontal strength
+				};
+				caps1P.setLinearVelocity(knockForce);
+			}
+		}
+	}
+
 	@Override
 	public void initializeGame()
 	{	
@@ -515,6 +595,9 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f hud1Color = new Vector3f(0, 0, 1);
 		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 25, 25);
 
+		// Handle dash
+		handleDash((float)elapsedTime);
+
 		avatarS.updateAnimation();
 		ghostS.updateAnimation();
 		setEarParameters();
@@ -523,7 +606,7 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f avatarL = avatar.getWorldLocation();
 		Vector3f npcL = npc.getWorldLocation();
 
-	// Player death check
+		// Player death check
 		if (avatarL.y < -2f) {
 			if (!redGlobalLight.isEnabled()) {
 				redGlobalLight.enable();
@@ -554,31 +637,26 @@ public class MyGame extends VariableFrameRateGame
 		}
 
 		if (isSwinging) {
-			// 1) compute normalized t in [0,1]
+			now = System.currentTimeMillis();
 			float t = (now - batSwingStart) / (float)SWING_MS;
 			if (t > 1f) t = 1f;
 
-			// 2) sine easing: 0→1→0 over π
 			float angle = swingAmplitude * (float)Math.sin((float)Math.PI * t);
-
-			// 3) apply downward rotation about X relative to rest
-			Matrix4f swingRot = new Matrix4f(batRestRotation)
-									.rotateY(-angle);
+			Matrix4f swingRot = new Matrix4f(batRestRotation).rotateY(-angle);
 			bat.setLocalRotation(swingRot);
 
-			// 4) once both animation & bat have reached end, reset
 			if (now >= swingEnd) {
 				isSwinging = false;
 				bat.setLocalRotation(batRestRotation);
-
-				// panda back to RUN if W still down
 				if (wHeld) {
 					avatarS.playAnimation("RUN", 1.0f, AnimatedShape.EndType.LOOP, 0);
-					if (protClient != null)
+					if (protClient != null) {
 						protClient.sendAnimationMessage("RUN");
+					}
 				}
 			}
 		}
+
 		if (!gameOver) {
 			long currentTime = System.currentTimeMillis();
 			double deltaTime = (currentTime - lastFrameTime) / 1000.0; // seconds
@@ -641,6 +719,7 @@ public class MyGame extends VariableFrameRateGame
 			}
 		}
 	}
+
 
 	private void checkForCollisions()
 	{ com.bulletphysics.dynamics.DynamicsWorld dynamicsWorld;
@@ -826,12 +905,28 @@ public class MyGame extends VariableFrameRateGame
 		else{
 			switch (e.getKeyCode())
 			{
-				case KeyEvent.VK_SPACE: 
+				case KeyEvent.VK_X:
 					for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
 					swingSound.stop();
 					swingSound.setLocation( ghost.getWorldLocation() );
 					setEarParameters();
 					swingSound.play();
+					}
+					break;
+
+				case KeyEvent.VK_SPACE:
+					long currentTime = System.currentTimeMillis();
+					if (currentTime > dashCooldownEnd && !isDashing) {
+						// Start dash
+						isDashing = true;
+						dashStartTime = currentTime;
+						dashCooldownEnd = currentTime + DASH_COOLDOWN;
+
+						// Play dash sound if you have one
+						swingSound.stop();
+						swingSound.setLocation(avatar.getWorldLocation());
+						setEarParameters();
+						swingSound.play();
 					}
 					break;
 				case KeyEvent.VK_C: // Toggle npc
@@ -843,62 +938,9 @@ public class MyGame extends VariableFrameRateGame
 					break;
 
 				case KeyEvent.VK_Q:
-					swingSound.stop();
-					swingSound.setLocation( avatar.getWorldLocation() );
-					setEarParameters();
-					swingSound.play();
-
-					avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
-					if(protClient != null)
-						protClient.sendAnimationMessage("SWING");
-					isSwinging = true;
-					batSwingStart  = System.currentTimeMillis();
-					swingEnd       = batSwingStart + SWING_MS;
-
-					if (caps1P != null) {
-						Vector3f npcPos = npc.getWorldLocation();
-						Vector3f avatarPos = avatar.getWorldLocation();
-						float distance = npcPos.distance(avatarPos);
-
-						if (distance <= attackRange) {
-							// Trigger orange flash at hit location
-							triggerOrangeFlash(avatar.getWorldLocation());
-
-							// Compute knockback direction
-							Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
-							float horizontalStrength = 8.0f;
-							float upwardStrength = 5.0f;
-
-						// build final velocity
-						float vx = kbDir.x * horizontalStrength;
-						float vz = kbDir.z * horizontalStrength;
-						float vy = upwardStrength;
-						float [] knockForce = { vx, vy, vz };
-
-						caps1P.setLinearVelocity(knockForce);
-					}
-					if (caps2P != null) {
-						// compute knockback direction
-						for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
-							Vector3f ghostPos    = ghost.getWorldLocation();
-							avatarPos = avatar.getWorldLocation();
-							Vector3f kbDir = new Vector3f(ghostPos).sub(avatarPos).normalize();
-							float horizontalStrength = 8.0f;
-							float upwardStrength     = 5.0f;   
-
-							// build final velocity
-							float vx = kbDir.x * horizontalStrength;
-							float vz = kbDir.z * horizontalStrength;
-							float vy = upwardStrength;
-							if(protClient != null)
-								protClient.sendKnockMessage(vx, vy, vz);
-							float [] knockForce = { vx, vy, vz };
-
-							caps1P.setLinearVelocity(knockForce);
-						}
-					}
+					handleSwing();
 					break;
-				}
+
 
 				case KeyEvent.VK_Z: // Toggle axis and physics lines
 					axis = !axis;
