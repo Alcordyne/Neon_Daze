@@ -108,6 +108,14 @@ public class MyGame extends VariableFrameRateGame
 	private final float swingAmplitude = (float)Math.toRadians(180f);  // 45° arc
 	private Vector3f batRestOffset;
 
+	//dash
+	private boolean isDashing = false;
+	private long dashStartTime = 0;
+	private long dashCooldownEnd = 0;
+	private static final long DASH_DURATION = 300;
+	private static final long DASH_COOLDOWN = 3000; // 3 seconds
+	private static final float DASH_SPEED = 0.3f;
+
 	public MyGame(String serverAddress, int serverPort, String protocol)
 	{	super();
 		gm = new GhostManager(this);
@@ -328,6 +336,25 @@ public class MyGame extends VariableFrameRateGame
 		(engine.getSceneGraph()).setSkyBoxEnabled(true);
 	}
 
+	private void handleDash(float elapsedTime) {
+		if (isDashing) {
+			long currentTime = System.currentTimeMillis();
+			if (currentTime - dashStartTime < DASH_DURATION) {
+				// Apply dash movement
+				Vector3f dashDirection = avatar.getWorldForwardVector();
+				Vector3f currentPos = avatar.getWorldLocation();
+				Vector3f newPos = new Vector3f(
+						currentPos.x + dashDirection.x * DASH_SPEED,
+						currentPos.y,
+						currentPos.z + dashDirection.z * DASH_SPEED
+				);
+				avatar.setLocalLocation(newPos);
+			} else {
+				isDashing = false;
+			}
+		}
+	}
+
 	@Override
 	public void initializeGame()
 	{	
@@ -515,6 +542,9 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f hud1Color = new Vector3f(0, 0, 1);
 		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 25, 25);
 
+		// Handle dash
+		handleDash((float)elapsedTime);
+
 		avatarS.updateAnimation();
 		ghostS.updateAnimation();
 		setEarParameters();
@@ -523,7 +553,7 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f avatarL = avatar.getWorldLocation();
 		Vector3f npcL = npc.getWorldLocation();
 
-	// Player death check
+		// Player death check
 		if (avatarL.y < -2f) {
 			if (!redGlobalLight.isEnabled()) {
 				redGlobalLight.enable();
@@ -640,6 +670,7 @@ public class MyGame extends VariableFrameRateGame
 			}
 		}
 	}
+
 
 	private void checkForCollisions()
 	{ com.bulletphysics.dynamics.DynamicsWorld dynamicsWorld;
@@ -820,12 +851,28 @@ public class MyGame extends VariableFrameRateGame
 		else{
 			switch (e.getKeyCode())
 			{
-				case KeyEvent.VK_SPACE: 
+				case KeyEvent.VK_X:
 					for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
 					swingSound.stop();
 					swingSound.setLocation( ghost.getWorldLocation() );
 					setEarParameters();
 					swingSound.play();
+					}
+					break;
+
+				case KeyEvent.VK_SPACE:
+					long currentTime = System.currentTimeMillis();
+					if (currentTime > dashCooldownEnd && !isDashing) {
+						// Start dash
+						isDashing = true;
+						dashStartTime = currentTime;
+						dashCooldownEnd = currentTime + DASH_COOLDOWN;
+
+						// Play dash sound if you have one
+						swingSound.stop();
+						swingSound.setLocation(avatar.getWorldLocation());
+						setEarParameters();
+						swingSound.play();
 					}
 					break;
 				case KeyEvent.VK_C: // Toggle npc
