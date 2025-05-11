@@ -22,29 +22,21 @@ public class TurnAction extends AbstractInputAction {
     @Override
     public void performAction(float time, Event evt) {
         float turnSpeed = turnAmount * time;
+        String key = evt.getComponent().getName();
 
         // Handle analog gamepad input
-        if (Math.abs(evt.getValue()) > 0) {
-            // Scale turn speed by gamepad tilt amount
-            turnSpeed *= Math.abs(evt.getValue()) * gamepadTurnMultiplier;
-
-            if (evt.getValue() < 0) {
-                // Left stick left: rotate left
-                game.getAvatar().globalYaw(turnSpeed);
-                if (protClient != null) {
-                    protClient.sendTurnMessage(turnSpeed);
-                }
-            } else if (evt.getValue() > 0) {
-                // Left stick right: rotate right
-                game.getAvatar().globalYaw(-turnSpeed);
-                if (protClient != null) {
-                    protClient.sendTurnMessage(-turnSpeed);
-                }
-            }
+        if (key.equals("A")) {
+            // Turn left
+            game.getAvatar().globalYaw(turnAmount*time);
+            if(protClient != null)
+                protClient.sendTurnMessage(turnAmount*time);
+        } else if (key.equals("D")) {
+            // Turn right
+            game.getAvatar().globalYaw(-turnAmount*time);
+            if(protClient != null)
+                protClient.sendTurnMessage(-turnAmount*time);
         }
-        // Handle keyboard input
         else {
-            String key = evt.getComponent().getName();
             if (key.equals("A")) {
                 // Turn left
                 game.getAvatar().globalYaw(turnSpeed);
