@@ -37,7 +37,7 @@ hazard controller, character moves, custom models
 */
 public class MyGame extends VariableFrameRateGame
 {
-	
+
 	public static MyGame game;
 	private static Engine engine;
 	private InputManager im;
@@ -91,6 +91,8 @@ public class MyGame extends VariableFrameRateGame
 	private float cRadius;
 	private float cHeight;
 
+	private static final float DEADZONE = .7f;
+
 	//Animation timing
 	private boolean wHeld      = false;
 	private boolean isSwinging = false;
@@ -104,7 +106,7 @@ public class MyGame extends VariableFrameRateGame
 	//Menu
 	private enum GameState { MENU, PLAYING, AVATARSELECT }
 	private GameState gameState    = GameState.MENU;
-	private int       menuSelection = 0;  
+	private int       menuSelection = 0;
 
 	//batswing
 	private long batSwingStart   = 0L;
@@ -129,7 +131,7 @@ public class MyGame extends VariableFrameRateGame
 			this.serverProtocol = ProtocolType.UDP;
 	}
 	public static void main(String[] args)
-	{	
+	{
 		game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
 		engine = new Engine(game);
 		game.initializeSystem();
@@ -317,7 +319,7 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void loadSounds()
-	{ 
+	{
 		AudioResource swingsfx,bgm;
 		audioMgr = engine.getAudioManager();
 
@@ -410,7 +412,7 @@ public class MyGame extends VariableFrameRateGame
 
 	@Override
 	public void initializeGame()
-	{	
+	{
 		gameStartTime = System.currentTimeMillis();
 		lastFrameTime = System.currentTimeMillis();
 		currFrameTime = System.currentTimeMillis();
@@ -435,7 +437,7 @@ public class MyGame extends VariableFrameRateGame
 		//(engine.getSceneGraph()).addNodeController(batc);
 		//batc.addTarget(bat);
 		//batc.enable();
-		
+
 
 		// ----------------- initialize camera ----------------
 		im = engine.getInputManager();
@@ -466,7 +468,7 @@ public class MyGame extends VariableFrameRateGame
 		// offset up by half your capsule’s height so it sits on the floor
 		Matrix4f avXform = new Matrix4f().translation(avPos.x, avPos.y, avPos.z);
 		caps2P = engine.getSceneGraph().addPhysicsCapsule(mass, toDoubleArray(avXform.get(vals)), cRadius, cHeight);
-		
+
 		avatar.setPhysicsObject(caps2P);
 		((JBulletPhysicsObject)caps2P).getRigidBody().setAngularFactor(0f);
 
@@ -488,59 +490,69 @@ public class MyGame extends VariableFrameRateGame
 		engine.enablePhysicsWorldRender();
 	}
 
-	private void setupInputs(){
+	private void setupInputs() {
 		// ----------------- OTHER INPUTS SECTION -----------------------------
 		FwdAction fwdAction = new FwdAction(this, protClient);
 		BckAction bckAction = new BckAction(this, protClient);
 		TurnAction turnAction = new TurnAction(this, protClient);
 
-			im.associateActionWithAllKeyboards(
-					Key.W, fwdAction,
-					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-			im.associateActionWithAllKeyboards(
-					Key.S, bckAction,
-					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-			im.associateActionWithAllKeyboards(
-					Key.A, turnAction,
-					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-			im.associateActionWithAllKeyboards(
-					Key.D, turnAction,
-					InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				Key.W, fwdAction,
+				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				Key.S, bckAction,
+				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				Key.A, turnAction,
+				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				Key.D, turnAction,
+				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 
 
 		im.associateActionWithAllGamepads(
-				Axis.X, (time, e) -> {
-					float xValue = e.getValue();
-					if (xValue < 0) {
-						// Negative X: yaw left
-
-							avatar.globalYaw(0.03f);
-
-					} else if (xValue > 0) {
-						// Positive X: yaw right
-
-							avatar.globalYaw(-0.03f);
-
-					} {
-
-					}
-				}, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+				Component.Identifier.Axis.X,
+				turnAction,
+				InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 
 		im.associateActionWithAllGamepads(
-				Axis.Y, (time, e) -> {
-					// Perform action based on Y-axis (negative or positive)
+				Component.Identifier.Axis.Y, (time, e) -> {
 					float yValue = e.getValue();
-					if (yValue < 0) {
-						// Negative Y: Move backward
-						bckAction.performAction(time, e);
-					} else if (yValue > 0) {
-						// Positive Y: Move forward
-						fwdAction.performAction(time, e);
+					if (Math.abs(yValue) > DEADZONE) {
+						if (yValue < 0) {
+							// Left stick up: move forward
+							fwdAction.performAction(time, e);
+						} else if (yValue > 0) {
+							// Left stick down: move backward
+							bckAction.performAction(time, e);
+						}
 					}
 				}, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		// Gamepad Buttons
+		im.associateActionWithAllGamepads(
+
+				Component.Identifier.Button._0, (time, e) -> { // A Button
+					if (e.getValue() == 1.0f) { // Button pressed
+						handleGamepadDash();
+					}
+				}, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+
+		im.associateActionWithAllGamepads(
+				Component.Identifier.Button._2, (time, e) -> { // X Button
+					if (e.getValue() == 1.0f) { // Button pressed
+						handleSwing();
+					}
+				}, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+
+		im.associateActionWithAllGamepads(
+				Component.Identifier.Button._7, (time, e) -> { // Start Button
+					if (e.getValue() == 1.0f && gameState == GameState.PLAYING) {
+						npcR = !npcR; // Toggle NPC behavior
+						System.out.println("NPC behavior: " + (npcR ? "Enabled" : "Disabled"));
+					}
+				}, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+
 	}
-
-
 	@Override
 	public void update() {
 
@@ -661,7 +673,7 @@ public class MyGame extends VariableFrameRateGame
 			long currentTime = System.currentTimeMillis();
 			double deltaTime = (currentTime - lastFrameTime) / 1000.0; // seconds
 			lastFrameTime = currentTime;
-			
+
 			im.update((float)deltaTime);
 			avatarMove();
 			processNetworking((float)deltaTime);
@@ -676,9 +688,9 @@ public class MyGame extends VariableFrameRateGame
 			checkForCollisions();
 			physicsEngine.update((float)elapsedTime);
 			for (GameObject go:engine.getSceneGraph().getGameObjects())
-			{ 
+			{
 				if (go.getPhysicsObject() != null)
-				{ 
+				{
 					// set translation
 					mat.set(toFloatArray(go.getPhysicsObject().getTransform()));
 					mat2.set(3,0,mat.m30());
@@ -690,8 +702,8 @@ public class MyGame extends VariableFrameRateGame
 					//mat.getRotation(aa);
 					//mat3.rotation(aa);
 					//go.setLocalRotation(mat3);
-				} 
-			} 
+				}
+			}
 			if (protClient != null) {
     			protClient.sendMoveMessage(avatar.getWorldLocation());
 }
@@ -717,6 +729,45 @@ public class MyGame extends VariableFrameRateGame
 				//physicsMat.get(vals);
 				//caps1P.setTransform(toDoubleArray(vals));
 			}
+		}
+	}
+
+	private void handleGamepadDash() {
+		long currentTime = System.currentTimeMillis();
+
+		// Check cooldown
+		if (currentTime < dashCooldownEnd) {
+			return; // Still on cooldown
+		}
+
+		// Start dash
+		isDashing = true;
+		dashStartTime = currentTime;
+		dashCooldownEnd = currentTime + DASH_COOLDOWN;
+
+		// Play sound
+		swingSound.stop();
+		swingSound.setLocation(avatar.getWorldLocation());
+		setEarParameters();
+		swingSound.play();
+
+		// Apply initial dash impulse
+		Vector3f dashDirection = avatar.getWorldForwardVector();
+		float dashPower = 15f; // Adjust this value as needed
+
+		// If using physics
+		if (caps2P != null) {
+			float[] impulse = {
+					dashDirection.x * dashPower,
+					0, // No vertical boost
+					dashDirection.z * dashPower
+			};
+			caps2P.setLinearVelocity(impulse);
+		} else {
+			// Non-physics movement
+			Vector3f newPos = avatar.getWorldLocation();
+			newPos.add(dashDirection.mul(DASH_SPEED));
+			avatar.setLocalLocation(newPos);
 		}
 	}
 
@@ -776,7 +827,7 @@ public class MyGame extends VariableFrameRateGame
 			float height = terr.getHeight(loc.x(), loc.z());
 			npc.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
 		}
-	
+
 		//avatar height
 		loc = avatar.getWorldLocation();
 		if ((loc.x > -20  && loc.x < 20) && (loc.z > -20 && loc.z < 20)){
@@ -821,7 +872,7 @@ public class MyGame extends VariableFrameRateGame
 
 
 	public void setEarParameters()
-	{ 
+	{
     Camera cam = engine.getRenderSystem().getViewport("LEFT").getCamera();
     audioMgr.getEar().setLocation(cam.getLocation());
     audioMgr.getEar().setOrientation(cam.getN(), new Vector3f(0,1,0));
@@ -868,7 +919,7 @@ public class MyGame extends VariableFrameRateGame
 					break;
 				case KeyEvent.VK_ENTER:
 					Vector3f white = new Vector3f(1,1,1);
-					
+
 					if (menuSelection == 0) {
 						//single player
 						if (gameState == GameState.MENU){
@@ -882,7 +933,7 @@ public class MyGame extends VariableFrameRateGame
 							engine.getHUDmanager().setHUD2("", white, 1, 1);
 							avatar.setTextureImage(whitePandatx);
 						}
-					} 
+					}
 					else {
 						//multiplayer
 						if (gameState == GameState.MENU){
@@ -937,7 +988,7 @@ public class MyGame extends VariableFrameRateGame
 					running = !running;
 					break;
 
-				case KeyEvent.VK_Q:
+				case KeyEvent.VK_L:
 					handleSwing();
 					break;
 
@@ -946,9 +997,9 @@ public class MyGame extends VariableFrameRateGame
 					axis = !axis;
 					physicsLines = !physicsLines;
 					if (axis) {
-						createAxis(); 
+						createAxis();
 					} else {
-						hideAxis(); 
+						hideAxis();
 					}
 					if(physicsLines){
 						engine.enablePhysicsWorldRender();
@@ -989,14 +1040,14 @@ public class MyGame extends VariableFrameRateGame
 	public GhostManager getGhostManager() { return gm; }
 	public ProtocolClient getProtClient() { return protClient;}
 	public static Engine getEngine() { return engine; }
-	
+
 	private void setupNetworking()
-	{	isClientConnected = false;	
-		try 
+	{	isClientConnected = false;
+		try
 		{	protClient = new ProtocolClient(InetAddress.getByName(serverAddress), serverPort, serverProtocol, this);
-		} 	catch (UnknownHostException e) 
+		} 	catch (UnknownHostException e)
 		{	e.printStackTrace();
-		}	catch (IOException e) 
+		}	catch (IOException e)
 		{	e.printStackTrace();
 		}
 		if (protClient == null)
@@ -1008,7 +1059,7 @@ public class MyGame extends VariableFrameRateGame
 			protClient.sendJoinMessage();
 		}
 	}
-	
+
 	protected void processNetworking(float elapsTime)
 	{	// Process packets received by the client from the server
 		if (protClient != null)
@@ -1018,7 +1069,7 @@ public class MyGame extends VariableFrameRateGame
 	public Vector3f getPlayerPosition() { return avatar.getWorldLocation(); }
 
 	public void setIsConnected(boolean value) { this.isClientConnected = value; }
-	
+
 	private class SendCloseConnectionPacketAction extends AbstractInputAction
 	{	@Override
 		public void performAction(float time, Event evt)
