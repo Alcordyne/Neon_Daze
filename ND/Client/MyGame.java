@@ -17,7 +17,6 @@ import java.util.*;
 import java.net.InetAddress;
 
 import java.net.UnknownHostException;
-
 import net.java.games.input.*;
 import net.java.games.input.Component.Identifier.*;
 import tage.networking.IGameConnection.ProtocolType;
@@ -84,7 +83,7 @@ public class MyGame extends VariableFrameRateGame
 	private TextureImage whitePandatx, redPandatx, ghostT, hmap, ground, wood,hammerTx;
 
 	private IAudioManager audioMgr;
-	private Sound swingSound;
+	public Sound swingSound;
 
 	private  AnimatedShape avatarS, ghostS,npcS;
 
@@ -322,14 +321,14 @@ public class MyGame extends VariableFrameRateGame
 		audioMgr = engine.getAudioManager();
 
 		swingsfx = audioMgr.createAudioResource("swing_mono.wav", AudioResourceType.AUDIO_SAMPLE);
-		swingSound = new Sound(swingsfx, SoundType.SOUND_EFFECT, 100, false);
+		swingSound = new Sound(swingsfx, SoundType.SOUND_EFFECT, 500, false);
 		swingSound.initialize(audioMgr);
 		swingSound.setMaxDistance(10.0f);
 		swingSound.setMinDistance(0.5f);
 		swingSound.setRollOff(5.0f);
 
 		bgm = audioMgr.createAudioResource("bgm.wav", AudioResourceType.AUDIO_STREAM);
-		Sound backgroundMusic = new Sound(bgm, SoundType.SOUND_MUSIC, 2, true); // `true` for looping
+		Sound backgroundMusic = new Sound(bgm, SoundType.SOUND_MUSIC, 1, true); // `true` for looping
 		backgroundMusic.initialize(audioMgr);
 		backgroundMusic.play();
 	}
@@ -404,6 +403,23 @@ public class MyGame extends VariableFrameRateGame
 						kbDir.z * 8.0f  // horizontal strength
 				};
 				caps1P.setLinearVelocity(knockForce);
+			}
+		}
+		if (caps2P != null) {
+			// compute knockback direction
+			for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
+				Vector3f ghostPos    = ghost.getWorldLocation();
+				Vector3f avatarPos = avatar.getWorldLocation();
+				Vector3f kbDir = new Vector3f(ghostPos).sub(avatarPos).normalize();
+				float horizontalStrength = 8.0f;
+				float upwardStrength     = 5.0f;  
+				// build final velocity
+				float vx = kbDir.x * horizontalStrength;
+				float vz = kbDir.z * horizontalStrength;
+				float vy = upwardStrength;
+				caps1P.setLinearVelocity(new float[]{ vx, vy, vz });
+				if(protClient != null)
+					protClient.sendKnockMessage(vx, vy, vz);
 			}
 		}
 	}
