@@ -588,6 +588,7 @@ public class MyGame extends VariableFrameRateGame
 			avatarMove();
 			processNetworking((float)deltaTime);
 		}
+		System.out.println(avatar.getWorldLocation());
 
 		if (running)
 		{ AxisAngle4f aa = new AxisAngle4f();
@@ -692,12 +693,17 @@ public class MyGame extends VariableFrameRateGame
 		Vector3f loc, fwd, up, right;
 		// adjusts npc height according to terrain
 		loc = npc.getWorldLocation();
-		float height = terr.getHeight(loc.x(), loc.z());
-		npc.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
+		if ((loc.x > -20  && loc.x < 20) && (loc.z > -20 && loc.z < 20)){
+			float height = terr.getHeight(loc.x(), loc.z());
+			npc.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
+		}
+	
 		//avatar height
 		loc = avatar.getWorldLocation();
-		height = terr.getHeight(loc.x(), loc.z());
-		avatar.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
+		if ((loc.x > -20  && loc.x < 20) && (loc.z > -20 && loc.z < 20)){
+			float height = terr.getHeight(loc.x(), loc.z());
+			avatar.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
+		}
 
 		Camera cam = (engine.getRenderSystem().getViewport("LEFT").getCamera());
 		loc = avatar.getWorldLocation();
