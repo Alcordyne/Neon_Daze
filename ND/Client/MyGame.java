@@ -14,7 +14,6 @@ import java.lang.Math;
 
 import java.io.*;
 import java.util.*;
-import java.util.UUID;
 import java.net.InetAddress;
 
 import java.net.UnknownHostException;
@@ -51,7 +50,7 @@ public class MyGame extends VariableFrameRateGame
 	private List<Light> gameLights = new ArrayList<>();
 	private Light orangeFlashLight; // For successful hit
 	private long orangeFlashEndTime = 0;
-	private static final long ORANGE_FLASH_DURATION = 500; // ms
+	private static final long orangeFlash = 500;
 
 
 	private PhysicsEngine physicsEngine;
@@ -71,6 +70,8 @@ public class MyGame extends VariableFrameRateGame
 	private boolean gameOver,npcR = false;
 	private double lastFrameTime, currFrameTime, elapsTime;
 	private long gameStartTime;
+
+	private static final float attackRange = 2.0f;
 
 
 	private int horizons;
@@ -299,7 +300,7 @@ public class MyGame extends VariableFrameRateGame
 
 		// Enable and set duration
 		orangeFlashLight.enable();
-		orangeFlashEndTime = System.currentTimeMillis() + ORANGE_FLASH_DURATION;
+		orangeFlashEndTime = System.currentTimeMillis() + orangeFlash;
 	}
 
 	@Override
@@ -841,8 +842,6 @@ public class MyGame extends VariableFrameRateGame
 					setEarParameters();
 					swingSound.play();
 
-					triggerOrangeFlash(avatar.getWorldLocation());
-
 					avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
 					if(protClient != null)
 						protClient.sendAnimationMessage("SWING");
@@ -851,12 +850,18 @@ public class MyGame extends VariableFrameRateGame
 					swingEnd       = batSwingStart + SWING_MS;
 
 					if (caps1P != null) {
-						// compute knockback direction
-						Vector3f npcPos    = npc.getWorldLocation();
+						Vector3f npcPos = npc.getWorldLocation();
 						Vector3f avatarPos = avatar.getWorldLocation();
-						Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
-						float horizontalStrength = 10.0f;
-						float upwardStrength     = 5.0f;   
+						float distance = npcPos.distance(avatarPos);
+
+						if (distance <= attackRange) {
+							// Trigger orange flash at hit location
+							triggerOrangeFlash(avatar.getWorldLocation());
+
+							// Compute knockback direction
+							Vector3f kbDir = new Vector3f(npcPos).sub(avatarPos).normalize();
+							float horizontalStrength = 8.0f;
+							float upwardStrength = 5.0f;
 
 						// build final velocity
 						float vx = kbDir.x * horizontalStrength;
@@ -870,12 +875,10 @@ public class MyGame extends VariableFrameRateGame
 						// compute knockback direction
 						for (GhostAvatar ghost : game.getGhostManager().getAllGhostAvatars()) {
 							Vector3f ghostPos    = ghost.getWorldLocation();
-							Vector3f avatarPos = avatar.getWorldLocation();
+							avatarPos = avatar.getWorldLocation();
 							Vector3f kbDir = new Vector3f(ghostPos).sub(avatarPos).normalize();
-							float horizontalStrength = 10.0f;
+							float horizontalStrength = 8.0f;
 							float upwardStrength     = 5.0f;   
-
-						
 
 							// build final velocity
 							float vx = kbDir.x * horizontalStrength;
@@ -889,6 +892,7 @@ public class MyGame extends VariableFrameRateGame
 						}
 					}
 					break;
+				}
 
 				case KeyEvent.VK_Z: // Toggle axis and physics lines
 					axis = !axis;
