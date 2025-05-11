@@ -45,6 +45,15 @@ public class MyGame extends VariableFrameRateGame
 	private NodeController rc,ocs;
 	private Light glight;
 
+	private Light greenSpotlight; // For NPC death
+	private Light redGlobalLight; // For player death
+
+	private List<Light> gameLights = new ArrayList<>();
+	private Light orangeFlashLight; // For successful hit
+	private long orangeFlashEndTime = 0;
+	private static final long ORANGE_FLASH_DURATION = 500; // ms
+
+
 	private PhysicsEngine physicsEngine;
 	private PhysicsObject caps1P, caps2P, planeP;
 
@@ -241,6 +250,56 @@ public class MyGame extends VariableFrameRateGame
 		glight.setLocation(new Vector3f(5.0f, 4.0f, 2.0f));
 		(engine.getSceneGraph()).addLight(glight);
 
+		// Green spotlight
+		greenSpotlight = new Light();
+		greenSpotlight.setType(Light.LightType.SPOTLIGHT);
+		greenSpotlight.setLocation(new Vector3f(0f, 5f, 0f));
+		greenSpotlight.setDirection(new Vector3f(0f, -1f, 0f));
+		greenSpotlight.setAmbient(0f, 1f, 0f); // Green ambient
+		greenSpotlight.setDiffuse(0f, 1f, 0f); // Green diffuse
+		greenSpotlight.setSpecular(0f, 1f, 0f); // Green specular
+		greenSpotlight.setCutoffAngle(45f);
+		greenSpotlight.disable(); // Start disabled
+		(engine.getSceneGraph()).addLight(greenSpotlight);
+
+		// Red global light
+		redGlobalLight = new Light();
+		redGlobalLight.setType(Light.LightType.POSITIONAL);
+		redGlobalLight.setAmbient(1f, 0f, 0f); // Red ambient
+		redGlobalLight.setDiffuse(1f, 0f, 0f); // Red diffuse
+		redGlobalLight.setSpecular(1f, 0f, 0f); // Red specular
+		redGlobalLight.disable(); // Start disabled
+		(engine.getSceneGraph()).addLight(redGlobalLight);
+
+		// Orange flash light
+		orangeFlashLight = new Light();
+		orangeFlashLight.setType(Light.LightType.POSITIONAL);
+		orangeFlashLight.setLocation(new Vector3f(0f, 0f, 0f));
+		orangeFlashLight.setAmbient(1f, 0.5f, 0f); // Orange color
+		orangeFlashLight.setDiffuse(1f, 0.5f, 0f);
+		orangeFlashLight.setSpecular(1f, 0.5f, 0f);
+		orangeFlashLight.disable();
+		(engine.getSceneGraph()).addLight(orangeFlashLight);
+
+	}
+
+	public void resetPlayerLights() {
+		redGlobalLight.disable();
+		glight.enable();
+	}
+
+	public void resetNPCLights() {
+		greenSpotlight.disable();
+	}
+
+	private void triggerOrangeFlash(Vector3f position) {
+		// Position the light slightly above the hit location
+		Vector3f lightPos = new Vector3f(position).add(0f, 2f, 0f);
+		orangeFlashLight.setLocation(lightPos);
+
+		// Enable and set duration
+		orangeFlashLight.enable();
+		orangeFlashEndTime = System.currentTimeMillis() + ORANGE_FLASH_DURATION;
 	}
 
 	@Override
@@ -453,7 +512,41 @@ public class MyGame extends VariableFrameRateGame
 
 		avatarS.updateAnimation();
 		ghostS.updateAnimation();
-		setEarParameters(); 
+		setEarParameters();
+
+		// Check for death plane (-2f on Y axis)
+		Vector3f avatarL = avatar.getWorldLocation();
+		Vector3f npcL = npc.getWorldLocation();
+
+	// Player death check
+		if (avatarL.y < -2f) {
+			if (!redGlobalLight.isEnabled()) {
+				redGlobalLight.enable();
+				glight.disable();
+				// You could add respawn logic here
+			}
+		} else if (redGlobalLight.isEnabled()) {
+			redGlobalLight.disable();
+			glight.enable();
+		}
+
+	// NPC death check
+		if (npcL.y < -2f) {
+			if (!greenSpotlight.isEnabled()) {
+				greenSpotlight.enable();
+				// Position spotlight above player
+				Vector3f avatarPos = avatar.getWorldLocation();
+				greenSpotlight.setLocation(new Vector3f(avatarPos.x, avatarPos.y + 5f, avatarPos.z));
+				// You could add NPC respawn logic here
+			}
+		} else if (greenSpotlight.isEnabled()) {
+			greenSpotlight.disable();
+		}
+
+	// Handle orange flash timeout
+		if (orangeFlashLight.isEnabled() && System.currentTimeMillis() > orangeFlashEndTime) {
+			orangeFlashLight.disable();
+		}
 
 		if (isSwinging) {
 			// 1) compute normalized t in [0,1]
@@ -726,6 +819,8 @@ public class MyGame extends VariableFrameRateGame
 					swingSound.setLocation( avatar.getWorldLocation() );
 					setEarParameters();
 					swingSound.play();
+
+					triggerOrangeFlash(avatar.getWorldLocation());
 
 					avatarS.playAnimation("SWING", 1.0f, AnimatedShape.EndType.STOP, 0);
 					if(protClient != null)
